@@ -3,115 +3,95 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>URL Golf — Challenge Prototypes</title>
-<link rel="stylesheet" href="shared/golf.css">
+<title>HACKATHON ARCADE</title>
+<link rel="stylesheet" href="shared/base.css">
 <style>
-  .hero{text-align:center; padding:14px 0 4px}
-  .hero h1{font-family:var(--mono); font-size:26px; margin:0; letter-spacing:.04em}
+  .hero{text-align:center; padding:18px 0 4px}
+  .hero h1{font-family:var(--mono); font-size:26px; margin:0; letter-spacing:.06em}
   .hero h1 .g{color:var(--accent)}
-  .hero p{color:var(--dim); font-size:13px; margin:8px auto 0; max-width:620px}
-  .urlline{
-    font-family:var(--mono); font-size:12px; color:var(--blue); background:#0f131c;
-    border:1px solid var(--border); border-radius:8px; padding:8px 14px; display:inline-block; margin-top:12px;
-  }
+  .hero p{color:var(--dim); font-size:13px; margin:10px auto 0; max-width:640px}
   .cards{display:grid; gap:14px}
-  @media(min-width:720px){ .cards{grid-template-columns:repeat(3,1fr)} }
+  @media(min-width:720px){ .cards{grid-template-columns:repeat(2,1fr)} }
   .card{
     background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px;
     display:flex; flex-direction:column; gap:10px; transition:transform .12s, border-color .15s;
   }
   .card:hover{transform:translateY(-3px); border-color:rgba(110,231,183,.45)}
-  .card .icon{font-size:32px; line-height:1}
-  .card h2{font-family:var(--mono); font-size:15px; margin:0; letter-spacing:.05em; color:var(--text); text-transform:none}
+  .card .icon{font-size:30px; line-height:1}
+  .card h2{font-family:var(--mono); font-size:15px; margin:0; letter-spacing:.05em}
   .card .lead{font-size:13px; color:var(--dim); flex:1}
-  .card .ex{font-family:var(--mono); font-size:11px; color:var(--violet); background:#0f131c;
-            border:1px solid var(--border); border-radius:7px; padding:7px 9px; word-break:break-all}
+  .card .meta{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+  .card .bar{height:7px; border-radius:999px; background:#242c3d; overflow:hidden}
+  .card .bar div{height:100%; background:var(--accent); width:0; transition:width .4s}
   .card a.play{
     text-decoration:none; text-align:center; font-family:var(--mono); font-weight:800; font-size:14px;
-    background:var(--accent); color:#062a1e; border-radius:9px; padding:11px;
+    background:var(--accent); color:var(--ink); border-radius:9px; padding:11px;
   }
   .card a.play:hover{filter:brightness(1.08)}
-  .old{display:grid; gap:10px}
-  @media(min-width:720px){ .old{grid-template-columns:repeat(3,1fr)} }
-  .old a{
-    text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border);
-    border-radius:10px; padding:12px 14px; display:block; font-size:13px;
-  }
-  .old a:hover{border-color:rgba(125,211,252,.45)}
-  .old a b{display:block; font-family:var(--mono); font-size:13px; margin-bottom:2px}
-  .old a span{color:var(--dim); font-size:12px}
-  .doclinks{display:flex; gap:10px; flex-wrap:wrap; font-size:13px}
+  .doclinks{display:flex; gap:12px; flex-wrap:wrap; font-size:13px}
   .doclinks a{color:var(--blue); text-decoration:none; border-bottom:1px dotted}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="hero">
-    <h1>URL <span class="g">GOLF</span></h1>
-    <p>「問題そのものをURLに埋め込み、URLを送るだけで同じ問題を遊べる」——
-       その仕組みがゲームとして成立するかを確かめるための、3本のHTML Mockです。</p>
-    <div class="urlline">index.html<b style="color:var(--accent)">#c=</b>eyJ2ZXJzaW9uIjoxLCJ0eXBl…  ← これがステージデータそのもの</div>
-  </div>
-
-  <div class="cards">
-    <div class="card">
-      <div class="icon">🤖</div>
-      <h2>ROUTE GOLF</h2>
-      <div class="lead">Program the shortest route.<br>
-        F / L / R だけでロボットをゴールへ。使った命令数がスコア。</div>
-      <div class="ex">F F R F F L F</div>
-      <a class="play" href="route-golf/index.html">PLAY</a>
-    </div>
-
-    <div class="card">
-      <div class="icon">🔧</div>
-      <h2>PIPELINE GOLF</h2>
-      <div class="lead">Transform input with fewer operations.<br>
-        関数を並べて INPUT を TARGET に変換。使った関数の数がスコア。</div>
-      <div class="ex">trim ▸ lowercase ▸ dash</div>
-      <a class="play" href="pipeline-golf/index.html">PLAY</a>
-    </div>
-
-    <div class="card">
-      <div class="icon">🎯</div>
-      <h2>REGEX GOLF</h2>
-      <div class="lead">Match exactly what you need.<br>
-        MATCH だけに当たる正規表現を書く。文字数がスコア。</div>
-      <div class="ex">/^user_\d+$/</div>
-      <a class="play" href="regex-golf/index.html">PLAY</a>
-    </div>
-  </div>
-
-  <div class="panel">
-    <h2>共通ループ</h2>
-    <p style="font-family:var(--mono); font-size:13px; color:var(--dim); margin:0">
-      CREATE → SHARE URL → SOLVE → RESULT → RETRY / REMIX
-    </p>
-    <p class="hint" style="margin:8px 0 0">
-      Challenge は URL の fragment（<code>#c=…</code>）に JSON → UTF-8 → Base64URL で入っています。
-      サーバーもDBも不要で、GitHub Pages のような静的ホスティングだけで動きます。解答はURLに含みません。
+    <h1>HACKATHON <span class="g">ARCADE</span></h1>
+    <p>
+      サーバーもDBも使わない、4本立てのブラウザゲーム集。<br>
+      進捗はこのブラウザの中だけに保存され、Challenge は URL そのものに載って共有されます。
     </p>
   </div>
 
-  <div class="panel">
-    <h2>企画ドキュメント</h2>
-    <div class="doclinks">
-      <a href="docs/route-golf.md">route-golf.md</a>
-      <a href="docs/pipeline-golf.md">pipeline-golf.md</a>
-      <a href="docs/regex-golf.md">regex-golf.md</a>
-      <a href="docs/comparison-golf.md">comparison-golf.md（3案比較）</a>
-    </div>
-  </div>
+  <div class="cards" id="cards"></div>
 
-  <div class="panel">
-    <h2>先に作った別テーマのプロトタイプ</h2>
-    <p class="hint" style="margin:0 0 10px">URL共有とは別軸で検討した3案。こちらも遊べます。</p>
-    <div class="old">
-      <a href="one-move-puzzle/index.html"><b>あと1手パズル</b><span>1回だけ動かして敵を全滅＋ゴール</span></a>
-      <a href="future-prediction/index.html"><b>10秒先を当てる</b><span>自動戦闘の生き残りを予想する</span></a>
-      <a href="memory-maze/index.html"><b>見えない迷路</b><span>3秒で覚えて記憶だけで進む</span></a>
-    </div>
-  </div>
 </div>
+
+<script type="module">
+import { progressSummary, loadJSON } from './shared/storage.js';
+
+/**
+ * ここの total は各ゲームのステージ数と一致している必要がある。
+ * ズレたら tests/portal.test.mjs が落ちるので、ステージを増やしたらここも更新する。
+ */
+const GAMES = [
+  { id:'route',    icon:'🤖', title:'ROUTE GOLF',       href:'route-golf/index.html',
+    lead:'F / L / R だけでロボットをゴールへ。★を全部拾って、できるだけ短い命令列で。',
+    tag:'命令数がスコア', total:16, unit:'ステージ' },
+  { id:'pipeline', icon:'🔧', title:'PIPELINE GOLF',    href:'pipeline-golf/index.html',
+    lead:'31種類の関数を並べて INPUT を TARGET に変換する。使った関数の数がスコア。',
+    tag:'関数の数がスコア', total:16, unit:'ステージ' },
+  { id:'future',   icon:'🔮', title:'10秒先を当てる',    href:'future-prediction/index.html',
+    lead:'乱数ゼロの自動戦闘。数字と並び順と特性だけを見て、最後に立っている1体を当てる。',
+    tag:'的中率がスコア', total:12, unit:'編成' },
+  { id:'maze',     icon:'🌀', title:'見えない迷路',      href:'memory-maze/index.html',
+    lead:'壁が見えるのは最初の数秒だけ。記憶だけを頼りに、鍵を拾ってゴールへ。',
+    tag:'歩数と壁ドンがスコア', total:12, unit:'ステージ' },
+];
+
+const stats = loadJSON('stats:future', { plays: 0, hits: 0, best: 0 });
+
+document.getElementById('cards').innerHTML = GAMES.map(g => {
+  const p = progressSummary(g.id);
+  const pct = Math.round(p.cleared / g.total * 100);
+  const extra = g.id === 'future' && stats.plays
+    ? `<span class="badge url">的中 ${stats.hits}/${stats.plays}</span><span class="badge violet">最高連続 ${stats.best}</span>`
+    : '';
+  return `
+    <div class="card">
+      <div class="icon">${g.icon}</div>
+      <h2>${g.title}</h2>
+      <div class="lead">${g.lead}</div>
+      <div class="meta">
+        <span class="badge">${g.total} ${g.unit}</span>
+        <span class="badge easy">${g.tag}</span>
+        <span class="badge ${p.cleared ? 'medium' : ''}">${p.cleared} / ${g.total} クリア</span>
+        <span class="badge medium">★ ${p.stars} / ${g.total * 3}</span>
+        ${extra}
+      </div>
+      <div class="bar"><div style="width:${pct}%"></div></div>
+      <a class="play" href="${g.href}">PLAY</a>
+    </div>`;
+}).join('');
+</script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 3つのプロトタイプを実際に触ったうえでの比較。**どれを作るかはここでは決めない。** 判断材料を並べる。
 
-- [01. あと1手パズル](01-one-move-puzzle.md) → [プロトタイプ](../one-move-puzzle/index.html)
+- [01. あと1手パズル](01-one-move-puzzle.md) → [プロトタイプ](../prototypes/one-move-puzzle/index.html)
 - [02. 10秒先を当てる](02-future-prediction.md) → [プロトタイプ](../future-prediction/index.html)
 - [03. 見えない迷路](03-memory-maze.md) → [プロトタイプ](../memory-maze/index.html)
 

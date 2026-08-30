@@ -1,0 +1,13 @@
+{
+  "name": "hackathon-202608-arcade",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "静的4本立てブラウザゲーム集（GitHub Pages / サーバーレス）",
+  "scripts": {
+    "test": "node --test tests/",
+    "build": "node scripts/build-site.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

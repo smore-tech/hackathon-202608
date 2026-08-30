@@ -7,7 +7,7 @@
 
 - [Route Golf](route-golf.md) → [Mock](../route-golf/index.html)
 - [Pipeline Golf](pipeline-golf.md) → [Mock](../pipeline-golf/index.html)
-- [Regex Golf](regex-golf.md) → [Mock](../regex-golf/index.html)
+- [Regex Golf](regex-golf.md) → [Mock](../prototypes/regex-golf/index.html)
 
 ## 総合比較表
 
