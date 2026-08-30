@@ -1,0 +1,148 @@
+/* =========================================================================
+   4ゲーム + ポータル 共通テーマ。
+   ゲーム固有の見た目は各 index.html の <style> に置き、ここには「どのゲームでも
+   同じ意味で使うもの」だけを入れる。
+   ========================================================================= */
+:root{
+  --bg:#0d1017; --panel:#151a24; --panel2:#1b2130;
+  --border:#283042; --text:#dbe3f0; --dim:#7c869c;
+  --accent:#6ee7b7; --blue:#7dd3fc; --amber:#fbbf24; --red:#f87171; --violet:#c4b5fd;
+  --ink:#062a1e;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+body{
+  margin:0; background:radial-gradient(circle at 50% -15%,#1a2130,#0a0c12 60%);
+  color:var(--text); font-family:var(--sans);
+  min-height:100vh; padding:14px 12px 48px; line-height:1.6;
+}
+.wrap{max-width:1000px; margin:0 auto; display:flex; flex-direction:column; gap:14px}
+
+/* --- ヘッダ / タブ --- */
+.top{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+.top h1{font-size:19px; margin:0; font-family:var(--mono); letter-spacing:.02em}
+.top h1 .g{color:var(--accent)}
+.home{font-size:12px; color:var(--dim); text-decoration:none; border-bottom:1px dotted var(--dim)}
+.home:hover{color:var(--text)}
+.tabs{display:flex; gap:6px; margin-left:auto; background:var(--panel); padding:4px; border-radius:10px; border:1px solid var(--border)}
+.tabs button{
+  font:inherit; font-size:13px; font-weight:700; letter-spacing:.06em; color:var(--dim);
+  background:none; border:0; padding:7px 14px; border-radius:7px; cursor:pointer; font-family:var(--mono);
+}
+.tabs button.on{background:var(--accent); color:var(--ink)}
+.tagline{font-size:12px; color:var(--dim); margin:-8px 0 0; font-family:var(--mono)}
+
+/* --- パネル --- */
+.panel{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px}
+.panel h2{
+  font-size:11px; margin:0 0 10px; color:var(--dim); font-family:var(--mono);
+  letter-spacing:.14em; text-transform:uppercase; font-weight:700;
+}
+.cols{display:grid; gap:14px}
+@media(min-width:760px){ .cols.two{grid-template-columns:1fr 1fr} .cols.side{grid-template-columns:minmax(0,1fr) 330px} }
+
+/* --- ボタン --- */
+button, .btn{
+  font:inherit; font-size:14px; color:var(--text); background:var(--panel2);
+  border:1px solid var(--border); border-radius:9px; padding:10px 16px; cursor:pointer;
+  transition:transform .07s, background .15s; font-family:var(--mono);
+}
+button:active:not(:disabled){transform:translateY(2px)}
+button:hover:not(:disabled){background:#242c3d}
+button:disabled{opacity:.35; cursor:not-allowed}
+button.primary{background:var(--accent); color:var(--ink); border-color:transparent; font-weight:800}
+button.primary:hover:not(:disabled){background:#8df0c8}
+button.ghost{background:none}
+button.danger{color:var(--red)}
+.row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+.spread{justify-content:space-between}
+
+/* --- チップ（レベル選択などの切り替え） --- */
+.chip{
+  font-family:var(--mono); font-size:12px; padding:7px 13px; border-radius:999px;
+  background:var(--panel2); border:1px solid var(--border); color:var(--dim); cursor:pointer;
+}
+.chip:hover:not(:disabled){background:#242c3d}
+.chip.on{background:var(--accent); color:var(--ink); border-color:transparent; font-weight:700}
+
+/* --- バッジ --- */
+.badge{
+  font-family:var(--mono); font-size:11px; padding:3px 9px; border-radius:999px;
+  border:1px solid var(--border); color:var(--dim); letter-spacing:.05em; white-space:nowrap;
+}
+.badge.easy{color:var(--accent); border-color:rgba(110,231,183,.4)}
+.badge.medium{color:var(--amber); border-color:rgba(251,191,36,.4)}
+.badge.hard{color:var(--red); border-color:rgba(248,113,113,.4)}
+.badge.url{color:var(--blue); border-color:rgba(125,211,252,.4)}
+.badge.violet{color:var(--violet); border-color:rgba(196,181,253,.4)}
+
+/* --- HUD --- */
+.hud{
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px;
+  background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:8px 14px;
+  font-variant-numeric:tabular-nums; font-family:var(--mono);
+}
+.hud b{color:var(--accent); font-weight:800}
+.hud .sep{width:1px; height:15px; background:var(--border)}
+
+/* --- 入力 --- */
+input[type=text], input[type=number], textarea, select{
+  font-family:var(--mono); font-size:14px; color:var(--text); background:#0f131c;
+  border:1px solid var(--border); border-radius:8px; padding:9px 11px; width:100%;
+}
+input:focus, textarea:focus, select:focus{outline:2px solid rgba(110,231,183,.35); outline-offset:-1px}
+textarea{resize:vertical; line-height:1.7}
+label.field{display:block; font-size:11px; color:var(--dim); font-family:var(--mono); letter-spacing:.1em; margin-bottom:5px; text-transform:uppercase}
+
+/* --- 結果 --- */
+.result{border-radius:10px; padding:12px 14px; font-family:var(--mono); font-size:14px; line-height:1.8}
+.result.clear{background:rgba(110,231,183,.12); border:1px solid rgba(110,231,183,.35); color:var(--accent)}
+.result.fail{background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.3); color:var(--red)}
+.result.idle{background:var(--panel2); color:var(--dim); border:1px solid var(--border)}
+.score{display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:13px}
+.score b{color:var(--text)}
+.par{font-weight:800; padding:2px 10px; border-radius:6px}
+.par.under{background:var(--accent); color:var(--ink)}
+.par.even{background:var(--blue); color:#06263a}
+.par.over{background:#3a4257; color:var(--text)}
+
+/* --- 共有 --- */
+.share-box{display:flex; flex-direction:column; gap:8px}
+.share-box textarea{font-size:12px; min-height:64px; color:var(--blue)}
+.copy-status{font-size:12px; font-family:var(--mono); min-height:18px}
+.copy-status.ok{color:var(--accent)}
+.copy-status.warn{color:var(--amber)}
+.notice{
+  font-size:13px; font-family:var(--mono); padding:9px 13px; border-radius:9px;
+  background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); color:var(--amber);
+}
+.notice.info{background:rgba(125,211,252,.1); border-color:rgba(125,211,252,.3); color:var(--blue)}
+.hint{font-size:12px; color:var(--dim); font-family:var(--mono)}
+code{font-family:var(--mono); background:var(--panel2); padding:1px 6px; border-radius:5px; font-size:.92em}
+
+/* --- ステージ選択（route / pipeline / maze で共用） --- */
+.stagegrid{display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.stagecard{
+  background:var(--panel2); border:1px solid var(--border); border-radius:11px; padding:11px 12px;
+  cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:5px; font-family:var(--sans);
+}
+.stagecard:hover{border-color:rgba(110,231,183,.45); background:#242c3d}
+.stagecard.on{border-color:var(--accent)}
+.stagecard .no{font-family:var(--mono); font-size:11px; color:var(--dim); letter-spacing:.1em}
+.stagecard .nm{font-size:13px; font-weight:700}
+.stagecard .st{font-size:13px; letter-spacing:.08em; min-height:20px}
+.stagecard .bs{font-family:var(--mono); font-size:11px; color:var(--dim)}
+.stagecard.cleared{background:linear-gradient(180deg,rgba(110,231,183,.10),rgba(110,231,183,.02))}
+.stars{color:var(--amber); letter-spacing:.1em}
+.stars .off{color:#3a4257}
+
+/* --- バナー（結果メッセージ） --- */
+.banner{
+  min-height:44px; display:flex; align-items:center; justify-content:center; text-align:center;
+  font-size:14px; padding:9px 16px; border-radius:10px; line-height:1.55;
+  background:var(--panel); border:1px solid var(--border); color:var(--dim);
+}
+.banner.ok{background:rgba(110,231,183,.14); border-color:rgba(110,231,183,.35); color:var(--accent)}
+.banner.ng{background:rgba(248,113,113,.12); border-color:rgba(248,113,113,.3); color:var(--red)}
+.center{display:flex; flex-direction:column; align-items:center; gap:13px}

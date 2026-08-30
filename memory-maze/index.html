@@ -3,39 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>見えない迷路 — Memory Maze</title>
+<title>見えない迷路</title>
+<link rel="stylesheet" href="../shared/base.css">
 <style>
-  :root{
-    --bg:#0e1016; --panel:#191d29; --line:#2c3346; --text:#e9edf6; --dim:#8b93a7;
-    --accent:#7fb4ff; --wall:#cdd7ec; --miss:#ff6b81; --goal:#ffcf5c;
-    --cell: min(15vw, 62px);
-  }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-  body{
-    margin:0; background:radial-gradient(circle at 50% -10%,#212a3f,#0b0d13 60%);
-    color:var(--text); font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans",sans-serif;
-    min-height:100vh; padding:16px 12px 36px; touch-action:manipulation;
-    display:flex; flex-direction:column; align-items:center; gap:13px;
-  }
-  h1{font-size:20px; margin:0; letter-spacing:.05em}
-  h1 span{color:var(--accent)}
-  .sub{font-size:12px; color:var(--dim); margin:-8px 0 0; text-align:center}
-
-  .bar{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center}
-  .chip{
-    font-size:13px; padding:8px 12px; border-radius:999px; background:#232a3b;
-    border:1px solid var(--line); cursor:pointer; color:var(--dim); font-family:inherit;
-  }
-  .chip.on{background:var(--accent); color:#0b2143; border-color:transparent; font-weight:700}
-
-  .hud{
-    display:flex; gap:10px; align-items:center; font-size:13px; flex-wrap:wrap; justify-content:center;
-    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 14px;
-    font-variant-numeric:tabular-nums;
-  }
-  .hud b{color:var(--accent)}
-  .hud .sep{width:1px; height:15px; background:var(--line)}
-
+  body{touch-action:manipulation}
+  :root{ --wall:#cdd7ec; --cell:min(14vw, 56px) }
   .stage{position:relative}
   .maze{
     display:grid; background:#141926; border:3px solid var(--wall); border-radius:6px;
@@ -43,391 +15,120 @@
   }
   .cell{
     width:var(--cell); height:var(--cell); position:relative;
-    display:flex; align-items:center; justify-content:center; font-size:calc(var(--cell)*.5);
+    display:flex; align-items:center; justify-content:center; font-size:calc(var(--cell)*.48);
     border-right:3px solid transparent; border-bottom:3px solid transparent;
     transition:border-color .3s;
   }
   .cell.wr{border-right-color:var(--wall)}
   .cell.wb{border-bottom-color:var(--wall)}
-  .cell.hr{border-right-color:rgba(255,107,129,.85)}
-  .cell.hb{border-bottom-color:rgba(255,107,129,.85)}
-  .cell.bump{background:rgba(255,107,129,.28)}
-  .cell.visited::before{
-    content:""; position:absolute; inset:26%; border-radius:50%; background:rgba(127,180,255,.16);
-  }
+  .cell.hr{border-right-color:rgba(248,113,113,.85)}
+  .cell.hb{border-bottom-color:rgba(248,113,113,.85)}
+  .cell.bump{background:rgba(248,113,113,.28)}
+  .cell.visited::before{content:""; position:absolute; inset:26%; border-radius:50%; background:rgba(125,211,252,.16)}
   #player{
     /* left/top を指定しないと基準が「迷路の直後」になり、transform で枠外へ飛ぶ */
     position:absolute; left:0; top:0; width:var(--cell); height:var(--cell);
-    display:flex; align-items:center; justify-content:center; font-size:calc(var(--cell)*.55);
+    display:flex; align-items:center; justify-content:center; font-size:calc(var(--cell)*.52);
     transition:transform .1s ease-out; pointer-events:none; z-index:3;
-    filter:drop-shadow(0 0 8px rgba(127,180,255,.8));
+    filter:drop-shadow(0 0 8px rgba(125,211,252,.8));
   }
   .countdown{
     position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    font-size:60px; font-weight:800; color:rgba(255,255,255,.85); pointer-events:none;
-    text-shadow:0 4px 20px rgba(0,0,0,.8); z-index:4;
+    font-size:58px; font-weight:800; color:rgba(255,255,255,.85); pointer-events:none;
+    text-shadow:0 4px 20px rgba(0,0,0,.8); z-index:4; font-family:var(--mono);
   }
-
-  .pad{display:grid; grid-template-columns:repeat(3,62px); grid-template-rows:repeat(2,54px); gap:8px}
+  .pad{display:grid; grid-template-columns:repeat(3,62px); grid-template-rows:repeat(2,52px); gap:8px}
   #up{grid-column:2/3}
   #left{grid-column:1/2; grid-row:2}
   #down{grid-column:2/3; grid-row:2}
   #right{grid-column:3/4; grid-row:2}
-
-  button{
-    font:inherit; font-size:20px; color:var(--text); background:#2b3145;
-    border:1px solid var(--line); border-radius:10px; padding:10px 14px; cursor:pointer;
-    transition:transform .08s;
-  }
-  button:active{transform:translateY(2px)}
-  button:disabled{opacity:.35; cursor:not-allowed}
-  .actions{display:flex; gap:10px; flex-wrap:wrap; justify-content:center}
-  .actions button{font-size:15px; min-width:132px}
-  .primary{background:var(--accent); color:#0b2143; border-color:transparent; font-weight:800}
-
-  .banner{
-    min-height:44px; display:flex; align-items:center; justify-content:center; text-align:center;
-    font-size:15px; padding:8px 16px; border-radius:10px; max-width:440px; line-height:1.55;
-  }
-  .banner.ok{background:rgba(77,214,160,.15); color:#4dd6a0}
-  .banner.ng{background:rgba(255,107,129,.13); color:var(--miss)}
-  .banner.idle{color:var(--dim)}
+  .pad button{font-size:20px; padding:8px 12px}
+  .actions button{min-width:130px}
+  .levelhead{font-family:var(--mono); font-size:11px; letter-spacing:.14em; color:var(--dim); margin:14px 0 8px}
+  .levelhead:first-child{margin-top:0}
+  .lives{letter-spacing:.12em}
 </style>
 </head>
 <body>
-  <h1>見えない<span>迷路</span></h1>
-  <p class="sub">壁が見えるのは最初の数秒だけ。あとは記憶だけが頼り。</p>
+<div class="wrap">
+  <div class="top">
+    <h1>見えない<span class="g">迷路</span></h1>
+    <a class="home" href="../index.html">← ゲーム一覧</a>
+    <div class="tabs">
+      <button id="tabStages">STAGES</button>
+      <button id="tabPlay" class="on">PLAY</button>
+    </div>
+  </div>
+  <p class="tagline">// 壁が見えるのは最初の数秒だけ。あとは記憶だけが頼り</p>
 
-  <div class="bar" id="sizeBar"></div>
+  <div id="notice" hidden></div>
 
-  <div class="hud">
-    <span>SEED <b id="seed">—</b></span><span class="sep"></span>
-    <span>移動 <b id="steps">0</b></span><span class="sep"></span>
-    <span>壁ドン <b id="miss">0</b></span><span class="sep"></span>
-    <span>時間 <b id="time">0.0</b>s</span>
+  <!-- ============ STAGES ============ -->
+  <div id="stagesView" hidden>
+    <div class="panel">
+      <div class="row spread" style="margin-bottom:12px">
+        <div class="hud">
+          <span>CLEAR <b id="hudCleared">0</b> / <span id="hudTotal">0</span></span><span class="sep"></span>
+          <span>★ <b id="hudStars">0</b> / <span id="hudStarMax">0</span></span>
+        </div>
+        <button id="resetProgress" class="ghost danger">記録をリセット</button>
+      </div>
+      <div id="stageList"></div>
+    </div>
   </div>
 
-  <div class="stage">
-    <div class="maze" id="maze"></div>
-    <div id="player">🔵</div>
-    <div class="countdown" id="countdown"></div>
+  <!-- ============ PLAY ============ -->
+  <div id="playView" class="center">
+    <div class="row" style="justify-content:center">
+      <span class="badge violet" id="chNo">STAGE 1</span>
+      <b id="chName" style="font-size:14px">—</b>
+      <span class="badge" id="chMode">ふつう</span>
+      <button id="prevStage" class="ghost">◀</button>
+      <button id="nextStage" class="ghost">▶</button>
+    </div>
+
+    <div class="hud">
+      <span>SEED <b id="seed">—</b></span><span class="sep"></span>
+      <span>移動 <b id="steps">0</b></span><span class="sep"></span>
+      <span>壁ドン <b id="miss">0</b></span>
+      <span id="livesWrap" hidden><span class="sep"></span>ライフ <b class="lives" id="lives">♥♥♥</b></span><span class="sep"></span>
+      <span>時間 <b id="time">0.0</b>s</span><span class="sep"></span>
+      <span>最短 <b id="need">—</b></span>
+    </div>
+
+    <div class="stage">
+      <div class="maze" id="maze"></div>
+      <div id="player">🔵</div>
+      <div class="countdown" id="countdown"></div>
+    </div>
+
+    <div class="banner" id="banner">STARTを押すと迷路が見える。覚えて、🏁 まで進め。</div>
+
+    <div class="pad">
+      <button id="up">↑</button><button id="left">←</button>
+      <button id="down">↓</button><button id="right">→</button>
+    </div>
+
+    <div class="row actions" style="justify-content:center">
+      <button id="start" class="primary">▶ START</button>
+      <button id="retry">↺ 同じ迷路で</button>
+      <button id="newMaze">🎲 新しい迷路</button>
+      <button id="share">🔗 SHARE</button>
+    </div>
+
+    <div class="share-box" style="max-width:520px; width:100%">
+      <div class="copy-status" id="copyStatus"></div>
+      <textarea id="shareOut" rows="2" readonly hidden></textarea>
+    </div>
+
+    <p class="hint" style="max-width:560px; text-align:center; line-height:1.8">
+      矢印キー / WASD / 方向ボタン / スワイプで移動・Space=START。
+      壁にぶつかると「壁ドン」が加算され、その壁は以後ずっと見えるようになる。
+      SHARE で同じ迷路（seed）のURLを渡せる。
+    </p>
   </div>
+</div>
 
-  <div class="banner idle" id="banner">STARTを押すと迷路が見える。覚えて、🏁 まで進め。</div>
-
-  <div class="pad">
-    <button id="up">↑</button><button id="left">←</button>
-    <button id="down">↓</button><button id="right">→</button>
-  </div>
-
-  <div class="actions">
-    <button id="start" class="primary">▶ START</button>
-    <button id="retry">↺ 同じ迷路で</button>
-    <button id="newMaze">🎲 新しい迷路</button>
-  </div>
-
-<script>
-/* ===================== ゲームロジック（DOM非依存） ===================== */
-
-/** 再現できる乱数（同じseedなら同じ迷路） */
-function mulberry32(seed){
-  let a = seed >>> 0;
-  return function(){
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/**
- * 穴掘り法（DFS）で完全迷路を作る。
- * v[r][c] = (r,c) と (r,c+1) の間の壁 / h[r][c] = (r,c) と (r+1,c) の間の壁
- */
-function generateMaze(rows, cols, seed){
-  const rand = mulberry32(seed);
-  const v = Array.from({ length: rows }, () => Array(cols).fill(true));
-  const h = Array.from({ length: rows }, () => Array(cols).fill(true));
-  const seen = Array.from({ length: rows }, () => Array(cols).fill(false));
-  const stack = [[0, 0]];
-  seen[0][0] = true;
-
-  while (stack.length){
-    const [r, c] = stack[stack.length - 1];
-    const nexts = [];
-    if (r > 0 && !seen[r-1][c]) nexts.push(['up', r-1, c]);
-    if (r < rows-1 && !seen[r+1][c]) nexts.push(['down', r+1, c]);
-    if (c > 0 && !seen[r][c-1]) nexts.push(['left', r, c-1]);
-    if (c < cols-1 && !seen[r][c+1]) nexts.push(['right', r, c+1]);
-
-    if (!nexts.length){ stack.pop(); continue; }
-    const [dir, nr, nc] = nexts[Math.floor(rand() * nexts.length)];
-    if (dir === 'up') h[nr][nc] = false;
-    if (dir === 'down') h[r][c] = false;
-    if (dir === 'left') v[nr][nc] = false;
-    if (dir === 'right') v[r][c] = false;
-    seen[nr][nc] = true;
-    stack.push([nr, nc]);
-  }
-  return { rows, cols, v, h, seed };
-}
-
-/**
- * 移動の可否を返す。
- * ok:true なら進める。ok:false のとき wall は「ぶつかった壁」（外周なら null）。
- */
-function tryMove(maze, r, c, dir){
-  const { rows, cols, v, h } = maze;
-  if (dir === 'up')    return r === 0        ? { ok:false, wall:null }
-                       : h[r-1][c] ? { ok:false, wall:{ type:'h', r:r-1, c } } : { ok:true, r:r-1, c };
-  if (dir === 'down')  return r === rows-1   ? { ok:false, wall:null }
-                       : h[r][c]   ? { ok:false, wall:{ type:'h', r, c } }     : { ok:true, r:r+1, c };
-  if (dir === 'left')  return c === 0        ? { ok:false, wall:null }
-                       : v[r][c-1] ? { ok:false, wall:{ type:'v', r, c:c-1 } } : { ok:true, r, c:c-1 };
-  if (dir === 'right') return c === cols-1   ? { ok:false, wall:null }
-                       : v[r][c]   ? { ok:false, wall:{ type:'v', r, c } }     : { ok:true, r, c:c+1 };
-  return { ok:false, wall:null };
-}
-
-/** スタートからゴールまでの最短手数（生成した迷路の難しさを測るのに使う） */
-function shortestPath(maze){
-  const { rows, cols } = maze;
-  const dist = Array.from({ length: rows }, () => Array(cols).fill(-1));
-  const queue = [[0, 0]];
-  dist[0][0] = 0;
-  while (queue.length){
-    const [r, c] = queue.shift();
-    for (const dir of ['up','down','left','right']){
-      const t = tryMove(maze, r, c, dir);
-      if (t.ok && dist[t.r][t.c] < 0){ dist[t.r][t.c] = dist[r][c] + 1; queue.push([t.r, t.c]); }
-    }
-  }
-  return dist[rows-1][cols-1];
-}
-
-/** 曲がりくねりすぎた迷路は覚えられないので、経路が短めの迷路を引くまで作り直す */
-function generatePlayableMaze(level){
-  let fallback = null;
-  for (let i = 0; i < 60; i++){
-    const seed = Math.floor(Math.random() * 90000) + 1000;
-    const maze = generateMaze(level.rows, level.cols, seed);
-    const len = shortestPath(maze);
-    if (len <= level.maxPath) return maze;
-    if (!fallback || len < shortestPath(fallback)) fallback = maze;
-  }
-  return fallback;
-}
-
-const LEVELS = [
-  { label:'5×5（やさしい）', rows:5, cols:5, peek:3000, maxPath:12 },
-  { label:'6×6（ふつう）',   rows:6, cols:6, peek:3000, maxPath:16 },
-  { label:'7×7（きつい）',   rows:7, cols:7, peek:4000, maxPath:20 },
-];
-
-/* ===================== 画面 ===================== */
-
-const el = {
-  sizeBar: document.getElementById('sizeBar'),
-  maze: document.getElementById('maze'),
-  player: document.getElementById('player'),
-  countdown: document.getElementById('countdown'),
-  banner: document.getElementById('banner'),
-  steps: document.getElementById('steps'),
-  miss: document.getElementById('miss'),
-  time: document.getElementById('time'),
-  seed: document.getElementById('seed'),
-  start: document.getElementById('start'),
-  retry: document.getElementById('retry'),
-  newMaze: document.getElementById('newMaze'),
-};
-
-let levelIndex = 0;
-let maze = null;
-let pos = { r:0, c:0 };
-let phase = 'ready';       // ready | peek | play | clear
-let stats = { steps:0, miss:0 };
-let timerId = null, startedAt = 0, peekTimers = [];
-
-function cellAt(r, c){ return document.getElementById(`m${r}-${c}`); }
-
-function buildMaze(){
-  const { rows, cols } = maze;
-  el.maze.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`;
-  el.maze.innerHTML = '';
-  for (let r = 0; r < rows; r++){
-    for (let c = 0; c < cols; c++){
-      const d = document.createElement('div');
-      d.className = 'cell';
-      d.id = `m${r}-${c}`;
-      if (r === rows-1 && c === cols-1) d.textContent = '🏁';
-      el.maze.appendChild(d);
-    }
-  }
-  movePlayerTo(0, 0, true);
-}
-
-function showWalls(on){
-  const { rows, cols, v, h } = maze;
-  for (let r = 0; r < rows; r++){
-    for (let c = 0; c < cols; c++){
-      const d = cellAt(r, c);
-      d.classList.toggle('wr', on && c < cols-1 && v[r][c]);
-      d.classList.toggle('wb', on && r < rows-1 && h[r][c]);
-    }
-  }
-}
-
-function clearRevealed(){
-  el.maze.querySelectorAll('.hr,.hb,.visited').forEach(d => d.classList.remove('hr','hb','visited'));
-}
-
-function movePlayerTo(r, c, instant){
-  pos = { r, c };
-  const cell = cellAt(r, c);
-  el.player.style.transition = instant ? 'none' : '';
-  el.player.style.transform = `translate(${cell.offsetLeft}px, ${cell.offsetTop}px)`;
-  if (instant) requestAnimationFrame(() => { el.player.style.transition = ''; });
-}
-
-function setBanner(kind, text){
-  el.banner.className = 'banner ' + kind;
-  el.banner.textContent = text;
-}
-
-function buildSizeBar(){
-  el.sizeBar.innerHTML = '';
-  LEVELS.forEach((lv, i) => {
-    const b = document.createElement('button');
-    b.className = 'chip' + (i === levelIndex ? ' on' : '');
-    b.textContent = lv.label;
-    b.addEventListener('click', () => { levelIndex = i; buildSizeBar(); newMaze(); });
-    el.sizeBar.appendChild(b);
-  });
-}
-
-function resetRun(){
-  peekTimers.forEach(clearTimeout); peekTimers = [];
-  clearInterval(timerId); timerId = null;
-  phase = 'ready';
-  stats = { steps:0, miss:0 };
-  el.steps.textContent = '0';
-  el.miss.textContent = '0';
-  el.time.textContent = '0.0';
-  el.countdown.textContent = '';
-  clearRevealed();
-  showWalls(false);   // STARTを押すまで壁は見せない（見放題だと記憶ゲームにならない）
-  movePlayerTo(0, 0, true);
-  el.start.disabled = false;
-  setBanner('idle', 'STARTを押すと数秒だけ壁が見える。覚えて 🏁 まで進め。');
-}
-
-function newMaze(){
-  const lv = LEVELS[levelIndex];
-  maze = generatePlayableMaze(lv);
-  el.seed.textContent = maze.seed;
-  buildMaze();
-  resetRun();
-}
-
-function startRun(){
-  if (phase === 'peek' || phase === 'play') return;
-  resetRun();
-  phase = 'peek';
-  el.start.disabled = true;
-  showWalls(true);
-  const peek = LEVELS[levelIndex].peek;
-  setBanner('idle', '👀 覚えろ！');
-
-  const total = Math.round(peek / 1000);
-  for (let i = 0; i < total; i++){
-    peekTimers.push(setTimeout(() => { el.countdown.textContent = String(total - i); }, i * 1000));
-  }
-  el.countdown.textContent = String(total);
-
-  peekTimers.push(setTimeout(() => {
-    el.countdown.textContent = '';
-    showWalls(false);
-    phase = 'play';
-    startedAt = Date.now();
-    timerId = setInterval(() => {
-      el.time.textContent = ((Date.now() - startedAt) / 1000).toFixed(1);
-    }, 100);
-    setBanner('idle', '🚶 GO! 記憶を頼りに進め。');
-  }, peek));
-}
-
-function move(dir){
-  if (phase !== 'play') return;
-  const res = tryMove(maze, pos.r, pos.c, dir);
-  const here = cellAt(pos.r, pos.c);
-
-  if (!res.ok){
-    stats.miss++;
-    el.miss.textContent = stats.miss;
-    here.classList.add('bump');
-    setTimeout(() => here.classList.remove('bump'), 200);
-    // ぶつかった壁だけは、以後ずっと見えるようにする（当たった記憶を可視化）
-    if (res.wall){
-      const w = cellAt(res.wall.r, res.wall.c);
-      w.classList.add(res.wall.type === 'v' ? 'hr' : 'hb');
-    }
-    setBanner('ng', '🧱 壁！ そっちじゃない。');
-    return;
-  }
-
-  here.classList.add('visited');
-  stats.steps++;
-  el.steps.textContent = stats.steps;
-  movePlayerTo(res.r, res.c, false);
-
-  if (res.r === maze.rows-1 && res.c === maze.cols-1) finish();
-  else if (el.banner.classList.contains('ng')) setBanner('idle', '🚶 GO! 記憶を頼りに進め。');
-}
-
-function finish(){
-  phase = 'clear';
-  clearInterval(timerId);
-  const sec = ((Date.now() - startedAt) / 1000).toFixed(1);
-  el.time.textContent = sec;
-  showWalls(true);   // 答え合わせ
-  setBanner('ok', `🏁 CLEAR!  移動 ${stats.steps} 歩 ／ 壁ドン ${stats.miss} 回 ／ ${sec} 秒`);
-  el.start.disabled = false;
-}
-
-/* --- 入力 --- */
-['up','down','left','right'].forEach(id => {
-  document.getElementById(id).addEventListener('click', () => move(id));
-});
-const KEYS = {
-  ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
-  w:'up', s:'down', a:'left', d:'right', W:'up', S:'down', A:'left', D:'right',
-};
-window.addEventListener('keydown', e => {
-  const dir = KEYS[e.key];
-  if (dir){ e.preventDefault(); move(dir); }
-  if (e.key === ' '){ e.preventDefault(); startRun(); }
-});
-
-let touch = null;
-el.maze.addEventListener('touchstart', e => {
-  touch = { x:e.touches[0].clientX, y:e.touches[0].clientY };
-}, { passive:true });
-el.maze.addEventListener('touchend', e => {
-  if (!touch) return;
-  const dx = e.changedTouches[0].clientX - touch.x;
-  const dy = e.changedTouches[0].clientY - touch.y;
-  touch = null;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
-  move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
-}, { passive:true });
-
-el.start.addEventListener('click', startRun);
-el.retry.addEventListener('click', startRun);   // 同じ迷路をもう一度（seedは変えない）
-el.newMaze.addEventListener('click', newMaze);
-window.addEventListener('resize', () => movePlayerTo(pos.r, pos.c, true));
-
-buildSizeBar();
-newMaze();
-</script>
+<script type="module" src="./main.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # 企画1：「あと1手」パズル
 
-> プロトタイプ: [../one-move-puzzle/index.html](../one-move-puzzle/index.html)
+> プロトタイプ: [../prototypes/one-move-puzzle/index.html](../prototypes/one-move-puzzle/index.html)
 
 ## 1. 一言で説明
 

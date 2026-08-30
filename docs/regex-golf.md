@@ -1,6 +1,6 @@
 # Regex Golf
 
-> Mock: [../regex-golf/index.html](../regex-golf/index.html)
+> Mock: [../prototypes/regex-golf/index.html](../prototypes/regex-golf/index.html)
 
 ## Elevator Pitch
 
