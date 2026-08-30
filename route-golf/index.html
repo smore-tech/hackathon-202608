@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Route Golf</title>
+<link rel="stylesheet" href="../shared/golf.css">
+<style>
+  .board{
+    position:relative; display:grid; gap:3px; padding:8px; background:#0f131c;
+    border:1px solid var(--border); border-radius:10px; width:max-content; margin:0 auto;
+    --cell:min(13.5vw, 58px);
+  }
+  .cell{
+    width:var(--cell); height:var(--cell); border-radius:6px; background:#1c2333;
+    display:flex; align-items:center; justify-content:center; font-size:calc(var(--cell)*.5);
+    cursor:default; transition:background .15s;
+  }
+  .board.editing .cell{cursor:pointer}
+  .board.editing .cell:hover{outline:2px solid rgba(110,231,183,.5); outline-offset:-2px}
+  .cell.wall{background:#39425c; box-shadow:inset 0 -3px 0 rgba(0,0,0,.3)}
+  .cell.goal{background:rgba(251,191,36,.15); outline:2px dashed rgba(251,191,36,.55); outline-offset:-3px}
+  .cell.startmark{outline:2px dotted rgba(125,211,252,.5); outline-offset:-3px}
+  .cell.trail::after{content:""; position:absolute; width:8px; height:8px; border-radius:50%; background:rgba(125,211,252,.35)}
+  .cell{position:relative}
+
+  #robot{
+    position:absolute; left:0; top:0; width:var(--cell); height:var(--cell);
+    display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:3;
+    transition:transform .18s ease-out;
+  }
+  #robot .body{
+    width:74%; height:74%; border-radius:9px; background:linear-gradient(180deg,#7dd3fc,#38bdf8);
+    display:flex; align-items:flex-start; justify-content:center;
+    box-shadow:0 0 14px rgba(125,211,252,.55); color:#062a3a; font-size:calc(var(--cell)*.42);
+    font-weight:900; line-height:1;
+  }
+  #robot.crash .body{background:linear-gradient(180deg,#fca5a5,#f87171); animation:shake .3s}
+  @keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+  .prog{
+    display:flex; flex-wrap:wrap; gap:5px; min-height:46px; padding:9px; background:#0f131c;
+    border:1px solid var(--border); border-radius:9px; font-family:var(--mono);
+  }
+  .prog .tok{
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    border-radius:6px; background:#242c3d; font-size:13px; font-weight:800; color:var(--dim);
+  }
+  .prog .tok.done{color:var(--text); background:#2f3a52}
+  .prog .tok.now{background:var(--accent); color:#062a1e; transform:scale(1.15)}
+  .prog .empty{color:#4b5468; font-size:12px; align-self:center}
+  .cmdbtn{width:56px; font-size:18px; font-weight:800; padding:12px 0}
+  .cmdbtn.f{color:var(--accent)} .cmdbtn.l,.cmdbtn.r{color:var(--blue)}
+
+  .palette button.on{background:var(--accent); color:#062a1e; border-color:transparent; font-weight:800}
+  .dirsel button.on{background:var(--blue); color:#06263a; border-color:transparent; font-weight:800}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>ROUTE <span class="g">GOLF</span></h1>
+    <a class="home" href="../index.html">← 3ゲーム一覧</a>
+    <div class="tabs">
+      <button id="tabPlay" class="on">PLAY</button>
+      <button id="tabCreate">CREATE</button>
+    </div>
+  </div>
+  <p class="tagline">// できるだけ短い命令列でロボットをゴールへ運べ</p>
+
+  <div id="notice" hidden></div>
+
+  <!-- ============ PLAY ============ -->
+  <div id="playView">
+    <div class="panel">
+      <h2>Challenge</h2>
+      <div class="row" style="justify-content:space-between">
+        <div class="row">
+          <span class="badge" id="chSize">5×5</span>
+          <span class="badge medium" id="chPar">PAR 10</span>
+          <span class="badge url" id="chSource">DEFAULT</span>
+        </div>
+        <div class="row" id="samples"></div>
+      </div>
+    </div>
+
+    <div class="cols side" style="margin-top:14px">
+      <div class="panel">
+        <h2>Board</h2>
+        <div class="board" id="board"><div id="robot"><div class="body">▲</div></div></div>
+        <div class="row" style="margin-top:12px; justify-content:center">
+          <button class="cmdbtn f" data-cmd="F">F</button>
+          <button class="cmdbtn l" data-cmd="L">L</button>
+          <button class="cmdbtn r" data-cmd="R">R</button>
+          <span class="hint">F=前進 / L=左回転 / R=右回転（キーボードも可）</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Program <span id="progLen" style="color:var(--text)">0</span></h2>
+        <div class="prog" id="prog"><span class="empty">// F / L / R を押して命令を並べる</span></div>
+        <div class="row" style="margin-top:10px">
+          <button id="run" class="primary">▶ RUN</button>
+          <button id="step">STEP</button>
+          <button id="reset">RESET</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="undo" class="ghost">UNDO</button>
+          <button id="clearProg" class="ghost danger">CLEAR PROGRAM</button>
+        </div>
+        <div class="result idle" id="result" style="margin-top:12px">READY — RUN で実行</div>
+        <div class="row" style="margin-top:10px">
+          <button id="share">🔗 SHARE CHALLENGE</button>
+          <button id="remix">🎛 REMIX</button>
+          <button id="copyResult" disabled>📋 COPY RESULT</button>
+        </div>
+        <div class="share-box" style="margin-top:8px">
+          <div class="copy-status" id="copyStatus"></div>
+          <textarea id="shareOut" rows="3" readonly hidden></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CREATE ============ -->
+  <div id="createView" hidden>
+    <div class="cols side">
+      <div class="panel">
+        <h2>Edit Board</h2>
+        <div class="board editing" id="edBoard"></div>
+        <p class="hint" style="text-align:center; margin-top:10px" id="edHint"></p>
+      </div>
+
+      <div class="panel">
+        <h2>Settings</h2>
+        <label class="field">Grid size</label>
+        <div class="row dirsel" id="sizeSel" style="margin-bottom:12px"></div>
+
+        <label class="field">Tool</label>
+        <div class="row palette" id="palette" style="margin-bottom:12px"></div>
+
+        <label class="field">Start direction</label>
+        <div class="row dirsel" id="dirSel" style="margin-bottom:12px"></div>
+
+        <label class="field">PAR</label>
+        <div class="row" style="margin-bottom:12px">
+          <input type="number" id="parInput" min="1" max="99" value="10" style="width:90px">
+          <button id="autoPar">AUTO</button>
+        </div>
+
+        <div class="result idle" id="edStatus">—</div>
+
+        <div class="row" style="margin-top:12px">
+          <button id="edShare" class="primary">🔗 SHARE CHALLENGE</button>
+          <button id="edTest">▶ TEST PLAY</button>
+        </div>
+        <div class="share-box" style="margin-top:8px">
+          <div class="copy-status" id="edCopyStatus"></div>
+          <textarea id="edShareOut" rows="3" readonly hidden></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../shared/url-codec.js"></script>
+<script>
+/* ==================== ゲームロジック（DOM非依存） ==================== */
+
+const TYPE = 'route';
+const DR = [-1, 0, 1, 0];          // 0:↑ 1:→ 2:↓ 3:←
+const DC = [0, 1, 0, -1];
+const DIR_GLYPH = ['↑', '→', '↓', '←'];
+
+/** 文字グリッドから Challenge データを作る（サンプル定義用） */
+function fromGrid(rows, sd, par){
+  const h = rows.length, w = rows[0].length, walls = [];
+  let sr = 0, sc = 0, gr = 0, gc = 0;
+  rows.forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch === '#') walls.push(r * w + c);
+    if (ch === 'S'){ sr = r; sc = c; }
+    if (ch === 'G'){ gr = r; gc = c; }
+  }));
+  return { w, h, walls, sr, sc, sd, gr, gc, par };
+}
+
+function isWall(ch, r, c){
+  return r < 0 || c < 0 || r >= ch.h || c >= ch.w || ch.walls.includes(r * ch.w + c);
+}
+
+/** 1命令を適用する。前進できなければ crash。 */
+function applyCommand(ch, state, cmd){
+  if (cmd === 'L') return { ok: true, state: { r: state.r, c: state.c, d: (state.d + 3) % 4 } };
+  if (cmd === 'R') return { ok: true, state: { r: state.r, c: state.c, d: (state.d + 1) % 4 } };
+  const nr = state.r + DR[state.d], nc = state.c + DC[state.d];
+  if (isWall(ch, nr, nc)) return { ok: false, state };
+  return { ok: true, state: { r: nr, c: nc, d: state.d } };
+}
+
+/** 最短命令数を幅優先で求める。到達不能なら null。 */
+function optimalCommands(ch){
+  if (ch.sr === ch.gr && ch.sc === ch.gc) return 0;
+  const key = (r, c, d) => (r * ch.w + c) * 4 + d;
+  const dist = new Map();
+  const queue = [{ r: ch.sr, c: ch.sc, d: ch.sd }];
+  dist.set(key(ch.sr, ch.sc, ch.sd), 0);
+  while (queue.length){
+    const cur = queue.shift();
+    const cost = dist.get(key(cur.r, cur.c, cur.d));
+    for (const cmd of ['F', 'L', 'R']){
+      const res = applyCommand(ch, cur, cmd);
+      if (!res.ok) continue;
+      const n = res.state;
+      if (n.r === ch.gr && n.c === ch.gc) return cost + 1;
+      const k = key(n.r, n.c, n.d);
+      if (!dist.has(k)){ dist.set(k, cost + 1); queue.push(n); }
+    }
+  }
+  return null;
+}
+
+/** URLから来たデータが Challenge として成立しているか。問題があれば理由を返す。 */
+function validateChallenge(d){
+  const int = v => Number.isInteger(v);
+  if (![d.w, d.h].every(v => int(v) && v >= 4 && v <= 8)) return 'グリッドサイズが不正です';
+  if (!Array.isArray(d.walls) || d.walls.length > d.w * d.h) return 'walls が不正です';
+  if (d.walls.some(i => !int(i) || i < 0 || i >= d.w * d.h)) return 'walls に範囲外の値があります';
+  const inside = (r, c) => int(r) && int(c) && r >= 0 && c >= 0 && r < d.h && c < d.w;
+  if (!inside(d.sr, d.sc)) return 'スタート位置が盤外です';
+  if (!inside(d.gr, d.gc)) return 'ゴール位置が盤外です';
+  if (!int(d.sd) || d.sd < 0 || d.sd > 3) return '向きが不正です';
+  if (d.sr === d.gr && d.sc === d.gc) return 'スタートとゴールが同じです';
+  if (d.walls.includes(d.sr * d.w + d.sc) || d.walls.includes(d.gr * d.w + d.gc)) return '壁とスタート/ゴールが重なっています';
+  if (!int(d.par) || d.par < 1 || d.par > 99) return 'PAR が不正です';
+  return null;
+}
+
+const SAMPLES = [
+  { name: 'EASY',   level: 'easy',   ch: fromGrid(['S....','.###.','...#.','.#...','....G'], 2, 10) },
+  { name: 'MEDIUM', level: 'medium', ch: fromGrid(['S..#..','##.#..','...#..','.#....','.#.##.','...#.G'], 2, 15) },
+  { name: 'HARD',   level: 'hard',   ch: fromGrid(['S.....#','#####.#','......#','.#####.','......#','.####..','G.....#'], 1, 20) },
+];
+const defaultChallenge = () => JSON.parse(JSON.stringify(SAMPLES[0].ch));
+
+/* ==================== 画面 ==================== */
+
+const $ = id => document.getElementById(id);
+const MAX_PROGRAM = 80;
+
+let challenge = null;
+let program = [];
+let robot = null;
+let execIndex = 0;
+let finished = false;
+let running = false;
+let lastResult = null;
+
+/* --- 盤面描画 --- */
+
+function paintBoard(container, ch, opts = {}){
+  container.style.gridTemplateColumns = `repeat(${ch.w}, var(--cell))`;
+  const robotEl = container.querySelector('#robot');
+  container.innerHTML = '';
+  if (robotEl) container.appendChild(robotEl);
+  for (let r = 0; r < ch.h; r++){
+    for (let c = 0; c < ch.w; c++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r; cell.dataset.c = c;
+      if (ch.walls.includes(r * ch.w + c)) cell.classList.add('wall');
+      if (r === ch.gr && c === ch.gc){ cell.classList.add('goal'); cell.textContent = '🏁'; }
+      if (r === ch.sr && c === ch.sc){
+        cell.classList.add('startmark');
+        if (opts.showStartGlyph) cell.textContent = DIR_GLYPH[ch.sd];
+      }
+      container.appendChild(cell);
+    }
+  }
+}
+
+function cellIn(container, r, c){
+  return container.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+}
+
+function placeRobot(instant){
+  const cell = cellIn($('board'), robot.r, robot.c);
+  if (!cell) return;
+  const el = $('robot');
+  el.style.transition = instant ? 'none' : '';
+  el.style.transform = `translate(${cell.offsetLeft}px, ${cell.offsetTop}px) rotate(${robot.d * 90}deg)`;
+  if (instant) requestAnimationFrame(() => { el.style.transition = ''; });
+}
+
+/* --- プログラム表示 --- */
+
+function renderProgram(){
+  const box = $('prog');
+  $('progLen').textContent = program.length;
+  if (!program.length){
+    box.innerHTML = '<span class="empty">// F / L / R を押して命令を並べる</span>';
+    return;
+  }
+  box.innerHTML = program.map((cmd, i) => {
+    const cls = i === execIndex && !finished && execIndex < program.length ? 'now'
+              : i < execIndex ? 'done' : '';
+    return `<span class="tok ${cls}">${cmd}</span>`;
+  }).join('');
+}
+
+function setResult(kind, html){
+  $('result').className = 'result ' + kind;
+  $('result').innerHTML = html;
+}
+
+/* --- 実行 --- */
+
+function resetRun(){
+  running = false;
+  finished = false;
+  execIndex = 0;
+  robot = { r: challenge.sr, c: challenge.sc, d: challenge.sd };
+  lastResult = null;
+  $('robot').classList.remove('crash');
+  $('board').querySelectorAll('.trail').forEach(n => n.classList.remove('trail'));
+  placeRobot(true);
+  renderProgram();
+  setResult('idle', 'READY — RUN で実行');
+  $('copyResult').disabled = true;
+}
+
+/** 1命令だけ進める。戻り値は 'running' | 'clear' | 'crash' | 'nogoal' | 'empty' */
+function stepOnce(){
+  if (finished) return 'done';
+  if (!program.length) return 'empty';
+  if (execIndex >= program.length){ finished = true; return 'nogoal'; }
+
+  const cmd = program[execIndex];
+  const res = applyCommand(challenge, robot, cmd);
+  execIndex++;
+
+  if (!res.ok){
+    finished = true;
+    $('robot').classList.add('crash');
+    renderProgram();
+    return 'crash';
+  }
+  cellIn($('board'), robot.r, robot.c).classList.add('trail');
+  robot = res.state;
+  placeRobot(false);
+  renderProgram();
+
+  if (robot.r === challenge.gr && robot.c === challenge.gc){ finished = true; return 'clear'; }
+  if (execIndex >= program.length){ finished = true; return 'nogoal'; }
+  return 'running';
+}
+
+function reportStatus(status){
+  if (status === 'empty'){ setResult('idle', '// プログラムが空です'); return; }
+  if (status === 'crash'){
+    setResult('fail', `💥 CRASH — ${execIndex}命令目の F で壁にぶつかった`);
+    return;
+  }
+  if (status === 'nogoal'){
+    setResult('fail', '🚫 NO GOAL — 命令を使い切ったがゴールに届かなかった');
+    return;
+  }
+  if (status === 'clear'){
+    const used = execIndex;
+    const par = Golf.parLabel(used, challenge.par);
+    lastResult = { used, par: challenge.par, label: par.text };
+    setResult('clear',
+      `🏁 <b>CLEAR!</b><div class="score">
+        <span>Commands: <b>${used}</b></span>
+        <span>PAR: <b>${challenge.par}</b></span>
+        <span class="par ${par.tone}">${par.text}</span>
+      </div>`);
+    $('copyResult').disabled = false;
+  }
+}
+
+async function run(){
+  if (running) return;
+  if (finished) resetRun();
+  running = true;
+  $('run').disabled = true; $('step').disabled = true;
+  let status = 'running';
+  while (status === 'running'){
+    status = stepOnce();
+    if (status === 'running') await new Promise(r => setTimeout(r, 230));
+  }
+  running = false;
+  $('run').disabled = false; $('step').disabled = false;
+  reportStatus(status);
+}
+
+function step(){
+  if (running) return;
+  if (finished) resetRun();
+  const status = stepOnce();
+  if (status === 'running') setResult('idle', `▶ ${execIndex} / ${program.length} 実行済み`);
+  else reportStatus(status);
+}
+
+function pushCommand(cmd){
+  if (program.length >= MAX_PROGRAM) return;
+  if (running) return;
+  if (execIndex > 0 || finished) resetRun();
+  program.push(cmd);
+  renderProgram();
+}
+
+/* --- Challenge の読み込み --- */
+
+function loadChallenge(ch, source){
+  challenge = JSON.parse(JSON.stringify(ch));
+  program = [];
+  paintBoard($('board'), challenge);
+  $('chSize').textContent = `${challenge.w}×${challenge.h}`;
+  $('chPar').textContent = `PAR ${challenge.par}`;
+  $('chSource').textContent = source === 'url' ? 'FROM URL' : 'SAMPLE';
+  $('shareOut').hidden = true;
+  $('copyStatus').textContent = '';
+  resetRun();
+}
+
+function showNotice(kind, text){
+  const n = $('notice');
+  n.hidden = false;
+  n.className = 'notice ' + kind;
+  n.textContent = text;
+}
+
+/* --- サンプル切り替え --- */
+
+SAMPLES.forEach(s => {
+  const b = document.createElement('button');
+  b.className = 'badge ' + s.level;
+  b.style.cursor = 'pointer';
+  b.textContent = s.name;
+  b.addEventListener('click', () => {
+    history.replaceState(null, '', location.pathname);
+    loadChallenge(s.ch, 'sample');
+    $('notice').hidden = true;
+  });
+  $('samples').appendChild(b);
+});
+
+/* --- 入力 --- */
+
+document.querySelectorAll('[data-cmd]').forEach(b =>
+  b.addEventListener('click', () => pushCommand(b.dataset.cmd)));
+$('run').addEventListener('click', run);
+$('step').addEventListener('click', step);
+$('reset').addEventListener('click', resetRun);
+$('undo').addEventListener('click', () => { if (running) return; resetRun(); program.pop(); renderProgram(); });
+$('clearProg').addEventListener('click', () => { if (running) return; program = []; resetRun(); });
+
+window.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f' || k === 'l' || k === 'r'){ pushCommand(k.toUpperCase()); }
+  else if (e.key === 'Enter'){ e.preventDefault(); run(); }
+  else if (e.key === 'Backspace'){ e.preventDefault(); if (!running){ resetRun(); program.pop(); renderProgram(); } }
+});
+
+/* --- Share / Result --- */
+
+$('share').addEventListener('click', () => {
+  const url = Golf.challengeUrl(TYPE, challenge);
+  Golf.setHash(TYPE, challenge);
+  Golf.copyText(url, $('shareOut'), $('copyStatus'));
+  $('chSource').textContent = 'FROM URL';
+});
+
+$('copyResult').addEventListener('click', () => {
+  if (!lastResult) return;
+  const text = [
+    'Route Golf',
+    '',
+    '✅ CLEAR',
+    `🧠 ${lastResult.used} commands`,
+    `🎯 PAR ${lastResult.par}`,
+    `⚡ ${lastResult.label}`,
+    '',
+    'Challenge:',
+    Golf.challengeUrl(TYPE, challenge),   // 解答は含めない
+  ].join('\n');
+  Golf.copyText(text, $('shareOut'), $('copyStatus'));
+});
+
+/* ==================== CREATE MODE ==================== */
+
+let draft = null;
+let tool = 'WALL';
+
+const TOOLS = ['EMPTY', 'WALL', 'START', 'GOAL'];
+
+function renderPalette(){
+  $('palette').innerHTML = '';
+  TOOLS.forEach(t => {
+    const b = document.createElement('button');
+    b.textContent = t;
+    b.className = t === tool ? 'on' : '';
+    b.addEventListener('click', () => { tool = t; renderPalette(); });
+    $('palette').appendChild(b);
+  });
+}
+
+function renderSizeSel(){
+  $('sizeSel').innerHTML = '';
+  [5, 6, 7].forEach(n => {
+    const b = document.createElement('button');
+    b.textContent = `${n}×${n}`;
+    b.className = draft.w === n ? 'on' : '';
+    b.addEventListener('click', () => resizeDraft(n));
+    $('sizeSel').appendChild(b);
+  });
+}
+
+function renderDirSel(){
+  $('dirSel').innerHTML = '';
+  DIR_GLYPH.forEach((g, i) => {
+    const b = document.createElement('button');
+    b.textContent = g;
+    b.className = draft.sd === i ? 'on' : '';
+    b.addEventListener('click', () => { draft.sd = i; renderDirSel(); renderDraft(); });
+    $('dirSel').appendChild(b);
+  });
+}
+
+function resizeDraft(n){
+  draft.w = n; draft.h = n;
+  draft.walls = [];
+  draft.sr = Math.min(draft.sr, n - 1); draft.sc = Math.min(draft.sc, n - 1);
+  draft.gr = n - 1; draft.gc = n - 1;
+  if (draft.sr === draft.gr && draft.sc === draft.gc){ draft.sr = 0; draft.sc = 0; }
+  renderSizeSel(); renderDraft();
+}
+
+function renderDraft(){
+  paintBoard($('edBoard'), draft, { showStartGlyph: true });
+  $('edBoard').querySelectorAll('.cell').forEach(cell => {
+    cell.addEventListener('click', () => editCell(+cell.dataset.r, +cell.dataset.c));
+  });
+  updateDraftStatus();
+}
+
+function editCell(r, c){
+  const idx = r * draft.w + c;
+  const isStart = r === draft.sr && c === draft.sc;
+  const isGoal = r === draft.gr && c === draft.gc;
+
+  if (tool === 'WALL'){
+    if (isStart || isGoal){ $('edHint').textContent = '⚠️ スタート/ゴールの上には壁を置けません'; return; }
+    const at = draft.walls.indexOf(idx);
+    if (at >= 0) draft.walls.splice(at, 1); else draft.walls.push(idx);
+  } else if (tool === 'EMPTY'){
+    const at = draft.walls.indexOf(idx);
+    if (at >= 0) draft.walls.splice(at, 1);
+  } else if (tool === 'START'){
+    if (isGoal){ $('edHint').textContent = '⚠️ ゴールと同じマスには置けません'; return; }
+    draft.walls = draft.walls.filter(i => i !== idx);
+    draft.sr = r; draft.sc = c;
+  } else if (tool === 'GOAL'){
+    if (isStart){ $('edHint').textContent = '⚠️ スタートと同じマスには置けません'; return; }
+    draft.walls = draft.walls.filter(i => i !== idx);
+    draft.gr = r; draft.gc = c;
+  }
+  $('edHint').textContent = '';
+  renderDraft();
+}
+
+function updateDraftStatus(){
+  draft.par = Math.max(1, Math.min(99, +$('parInput').value || 1));
+  const problem = validateChallenge(draft);
+  if (problem){
+    $('edStatus').className = 'result fail';
+    $('edStatus').textContent = '⚠️ ' + problem;
+    $('edShare').disabled = true; $('edTest').disabled = true;
+    return;
+  }
+  const best = optimalCommands(draft);
+  if (best === null){
+    $('edStatus').className = 'result fail';
+    $('edStatus').textContent = '🚫 UNSOLVABLE — ゴールに到達できません';
+    $('edShare').disabled = true; $('edTest').disabled = true;
+    return;
+  }
+  $('edStatus').className = 'result clear';
+  $('edStatus').innerHTML =
+    `✅ SOLVABLE<div class="score"><span>最短: <b>${best}</b> commands</span><span>PAR: <b>${draft.par}</b></span>` +
+    `<span class="hint">${draft.par > best ? `PAR ${best - draft.par} まで縮められる` : 'PARが最短以下＝縮める余地なし'}</span></div>`;
+  $('edShare').disabled = false; $('edTest').disabled = false;
+}
+
+function openCreate(base){
+  draft = JSON.parse(JSON.stringify(base));
+  $('parInput').value = draft.par;
+  tool = 'WALL';
+  renderPalette(); renderSizeSel(); renderDirSel(); renderDraft();
+  $('edHint').textContent = '';
+  $('edShareOut').hidden = true;
+  $('edCopyStatus').textContent = '';
+}
+
+$('parInput').addEventListener('input', updateDraftStatus);
+$('autoPar').addEventListener('click', () => {
+  const best = optimalCommands(draft);
+  if (best === null) return;
+  $('parInput').value = best + 1;      // 最短+1 にして「PAR -1」を狙えるようにする
+  updateDraftStatus();
+});
+$('edShare').addEventListener('click', () => {
+  updateDraftStatus();
+  if (validateChallenge(draft)) return;
+  Golf.copyText(Golf.challengeUrl(TYPE, draft), $('edShareOut'), $('edCopyStatus'));
+});
+$('edTest').addEventListener('click', () => {
+  Golf.setHash(TYPE, draft);
+  loadChallenge(draft, 'url');
+  switchTab('play');
+});
+
+/* --- タブ --- */
+
+function switchTab(which){
+  const play = which === 'play';
+  $('playView').hidden = !play;
+  $('createView').hidden = play;
+  $('tabPlay').classList.toggle('on', play);
+  $('tabCreate').classList.toggle('on', !play);
+  if (play) placeRobot(true);
+}
+$('tabPlay').addEventListener('click', () => switchTab('play'));
+$('tabCreate').addEventListener('click', () => { openCreate(challenge); switchTab('create'); });
+$('remix').addEventListener('click', () => { openCreate(challenge); switchTab('create'); });
+
+/* --- 起動 --- */
+
+const loaded = Golf.readChallenge({ type: TYPE, validate: validateChallenge, fallback: defaultChallenge });
+loadChallenge(loaded.data, loaded.source);
+if (loaded.source === 'invalid'){
+  showNotice('', `⚠️ Invalid Challenge: ${loaded.error} — DEFAULT CHALLENGE を読み込みました`);
+} else if (loaded.source === 'url'){
+  showNotice('info', '🔗 URLから Challenge を読み込みました');
+}
+openCreate(challenge);
+window.addEventListener('resize', () => placeRobot(true));
+</script>
+</body>
+</html>

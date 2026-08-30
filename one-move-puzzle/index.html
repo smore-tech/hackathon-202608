@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>あと1手 — One Move Puzzle</title>
+<style>
+  :root{
+    --bg:#12141c; --panel:#1c1f2b; --line:#2e3444; --text:#e8ecf5; --dim:#8b93a7;
+    --accent:#4dd6a0; --danger:#ff6b81; --goal:#ffcf5c; --player:#5ab0ff;
+    --cell: min(15vw, 74px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{
+    margin:0; background:radial-gradient(circle at 50% -10%,#1e2333,#0e1017 60%);
+    color:var(--text); font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans",sans-serif;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:16px 12px 32px; gap:14px;
+  }
+  h1{font-size:20px; margin:0; letter-spacing:.06em}
+  h1 span{color:var(--accent)}
+  .sub{font-size:12px; color:var(--dim); margin:-8px 0 0}
+
+  .hud{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:8px 14px; font-size:13px;
+  }
+  .hud b{color:var(--accent)}
+  .hud .sep{width:1px; height:16px; background:var(--line)}
+
+  .board{
+    display:grid; gap:4px; padding:10px; background:var(--panel);
+    border:1px solid var(--line); border-radius:14px;
+    box-shadow:0 10px 40px rgba(0,0,0,.45);
+  }
+  .cell{
+    width:var(--cell); height:var(--cell); border-radius:8px; background:#232838;
+    display:flex; align-items:center; justify-content:center;
+    font-size:calc(var(--cell) * .5); position:relative; transition:background .15s;
+  }
+  .cell.wall{background:#414a63; box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+  .cell.arrow{color:#ffd98a; font-size:calc(var(--cell) * .42); font-weight:700; background:#2b3145}
+  .cell.goal{background:rgba(255,207,92,.14); outline:2px dashed rgba(255,207,92,.5); outline-offset:-4px}
+  .cell.trail::after{
+    content:""; position:absolute; inset:22%; border-radius:50%;
+    background:rgba(90,176,255,.35); animation:pop .25s ease-out;
+  }
+  .cell .tile, .cell .actor{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  }
+  .cell .actor{z-index:2; filter:drop-shadow(0 0 6px rgba(90,176,255,.7))}
+  .cell.hit{animation:shake .3s}
+  @keyframes pop{from{transform:scale(.3); opacity:0} to{transform:scale(1); opacity:1}}
+  @keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  .boom{animation:boom .35s ease-out forwards}
+  @keyframes boom{to{transform:scale(1.8); opacity:0}}
+
+  .pad{display:grid; grid-template-columns:repeat(3,64px); grid-template-rows:repeat(2,56px); gap:8px}
+  .pad button{grid-column:auto}
+  #up{grid-column:2/3}
+  #left{grid-column:1/2; grid-row:2}
+  #down{grid-column:2/3; grid-row:2}
+  #right{grid-column:3/4; grid-row:2}
+
+  button{
+    font:inherit; font-size:20px; color:var(--text); background:#2b3145;
+    border:1px solid var(--line); border-radius:10px; padding:10px 14px; cursor:pointer;
+    transition:transform .08s, background .15s;
+  }
+  button:active{transform:translateY(2px)}
+  button:hover:not(:disabled){background:#353c54}
+  button:disabled{opacity:.35; cursor:not-allowed}
+  .actions{display:flex; gap:10px}
+  .actions button{font-size:15px; min-width:130px}
+  .primary{background:var(--accent); color:#0d2b21; border-color:transparent; font-weight:700}
+
+  .banner{
+    min-height:46px; display:flex; align-items:center; justify-content:center; text-align:center;
+    font-size:15px; padding:8px 16px; border-radius:10px; max-width:420px; line-height:1.5;
+  }
+  .banner.ok{background:rgba(77,214,160,.15); color:var(--accent)}
+  .banner.ng{background:rgba(255,107,129,.13); color:var(--danger)}
+  .banner.idle{color:var(--dim)}
+  .legend{display:flex; gap:14px; font-size:12px; color:var(--dim); flex-wrap:wrap; justify-content:center}
+</style>
+</head>
+<body>
+  <h1>あと<span>1手</span>パズル</h1>
+  <p class="sub">操作できるのは たった1回。動かす前に、盤面を読み切れ。</p>
+
+  <div class="hud">
+    <span>STAGE <b id="stageNo">1</b>/3</span>
+    <span class="sep"></span>
+    <span>残り操作 <b id="moves">1</b></span>
+    <span class="sep"></span>
+    <span>敵 <b id="enemies">0</b></span>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <div class="legend">
+    <span>🤖 自分</span><span>👾 敵</span><span>🏁 ゴール</span>
+    <span>➡ 向き変え</span><span>⬛ 壁</span>
+  </div>
+
+  <div class="banner idle" id="banner">1回だけ動ける。滑って止まるまで進み、通った敵は倒す。</div>
+
+  <div class="pad">
+    <button id="up">↑</button><button id="left">←</button>
+    <button id="down">↓</button><button id="right">→</button>
+  </div>
+
+  <div class="actions">
+    <button id="retry">↺ Retry</button>
+    <button id="next" class="primary">Next Puzzle →</button>
+  </div>
+
+<script>
+/* ===================== ゲームロジック（DOM非依存） ===================== */
+
+const N = 5;
+// . 空き / # 壁 / P 自分 / E 敵 / G ゴール / ^v<> 向き変えタイル
+const STAGES = [
+  {
+    title: 'まっすぐ走れ',
+    grid: [
+      '.....',
+      '..#..',
+      'P.E.G',
+      '..#..',
+      '.....',
+    ],
+  },
+  {
+    title: '曲がる床',
+    grid: [
+      '.....',
+      '>..Ev',
+      'P.#..',
+      '.#...',
+      '....G',
+    ],
+  },
+  {
+    title: '大回り',
+    grid: [
+      '>.E.v',
+      '.#.#.',
+      '.GE.<',
+      '.#.#.',
+      'P...^',
+    ],
+  },
+];
+
+const DIRS = { up:[-1,0], down:[1,0], left:[0,-1], right:[0,1] };
+const ARROW_TO_DIR = { '^':'up', 'v':'down', '<':'left', '>':'right' };
+const ARROW_GLYPH = { '^':'⬆', 'v':'⬇', '<':'⬅', '>':'➡' };
+
+function parseStage(stage){
+  const cells = stage.grid.map(row => row.split(''));
+  let start = null;
+  let enemies = 0;
+  cells.forEach((row, r) => row.forEach((ch, c) => {
+    if (ch === 'P'){ start = { r, c }; row[c] = '.'; }
+    if (ch === 'E') enemies++;
+  }));
+  return { cells, start, enemies, title: stage.title };
+}
+
+/** 1手ぶんの移動をシミュレートする。DOMには触らない。 */
+function simulateMove(level, dir){
+  const { cells } = level;
+  let { r, c } = level.start;
+  let d = dir;
+  const path = [{ r, c, kill:false }];
+  let killed = 0;
+  let reason = 'loop';
+
+  for (let step = 0; step < 60; step++){
+    const [dr, dc] = DIRS[d];
+    const nr = r + dr, nc = c + dc;
+    if (nr < 0 || nr >= N || nc < 0 || nc >= N){ reason = 'blocked'; break; }
+    const ch = cells[nr][nc];
+    if (ch === '#'){ reason = 'blocked'; break; }
+
+    r = nr; c = nc;
+    const kill = (ch === 'E');
+    if (kill) killed++;
+    path.push({ r, c, kill });
+
+    if (ch === 'G'){ reason = 'goal'; break; }
+    if (ARROW_TO_DIR[ch]) d = ARROW_TO_DIR[ch];
+  }
+
+  const cleared = (reason === 'goal' && killed === level.enemies);
+  let message;
+  if (cleared) message = '🎉 CLEAR！ 敵を全部倒してゴール。';
+  else if (reason === 'goal') message = 'ゴールしたけど、敵が残っている。';
+  else if (reason === 'blocked') message = '壁で止まってしまった。ゴールに届かない。';
+  else message = '同じ場所をぐるぐる回っている。';
+
+  return { path, killed, cleared, reason, message };
+}
+
+/* ===================== 画面 ===================== */
+
+const el = {
+  board: document.getElementById('board'),
+  banner: document.getElementById('banner'),
+  stageNo: document.getElementById('stageNo'),
+  moves: document.getElementById('moves'),
+  enemies: document.getElementById('enemies'),
+  retry: document.getElementById('retry'),
+  next: document.getElementById('next'),
+};
+const padButtons = ['up','down','left','right'].map(id => document.getElementById(id));
+
+let stageIndex = 0;
+let level = null;
+let busy = false;
+let solved = false;
+
+function buildBoard(){
+  el.board.style.gridTemplateColumns = `repeat(${N}, var(--cell))`;
+  el.board.innerHTML = '';
+  for (let r = 0; r < N; r++){
+    for (let c = 0; c < N; c++){
+      const div = document.createElement('div');
+      div.className = 'cell';
+      div.id = `c${r}-${c}`;
+      div.innerHTML = '<span class="tile"></span>';
+      el.board.appendChild(div);
+    }
+  }
+}
+
+function cellAt(r, c){ return document.getElementById(`c${r}-${c}`); }
+
+function renderStage(){
+  // 前回の🤖が盤面に残らないように、必ず消してから描き直す
+  el.board.querySelectorAll('.actor').forEach(node => node.remove());
+  for (let r = 0; r < N; r++){
+    for (let c = 0; c < N; c++){
+      const ch = level.cells[r][c];
+      const div = cellAt(r, c);
+      div.className = 'cell';
+      const tile = div.querySelector('.tile');
+      tile.textContent = '';
+      if (ch === '#') div.classList.add('wall');
+      else if (ch === 'G'){ div.classList.add('goal'); tile.textContent = '🏁'; }
+      else if (ch === 'E') tile.textContent = '👾';
+      else if (ARROW_GLYPH[ch]){ div.classList.add('arrow'); tile.textContent = ARROW_GLYPH[ch]; }
+    }
+  }
+  const p = document.createElement('span');
+  p.className = 'actor';
+  p.id = 'player';
+  p.textContent = '🤖';
+  cellAt(level.start.r, level.start.c).appendChild(p);
+}
+
+function loadStage(i){
+  stageIndex = i;
+  level = parseStage(STAGES[i]);
+  busy = false;
+  solved = false;
+  renderStage();
+  el.stageNo.textContent = i + 1;
+  el.moves.textContent = '1';
+  el.enemies.textContent = level.enemies;
+  setBanner('idle', `STAGE ${i+1}「${level.title}」— 1手で敵を全滅させ、ゴールへ。`);
+  setPad(true);
+  el.next.disabled = false;
+}
+
+function setBanner(kind, text){
+  el.banner.className = `banner ${kind}`;
+  el.banner.textContent = text;
+}
+
+function setPad(enabled){
+  padButtons.forEach(b => b.disabled = !enabled);
+}
+
+const wait = ms => new Promise(res => setTimeout(res, ms));
+
+async function play(dir){
+  if (busy || solved) return;
+  busy = true;
+  setPad(false);
+  el.moves.textContent = '0';
+  setBanner('idle', '……動いている。');
+
+  const result = simulateMove(level, dir);
+
+  // 1マスも動けない方向は「手」として消費しない（ミスタップ救済）
+  if (result.path.length === 1){
+    el.moves.textContent = '1';
+    setBanner('ng', 'その方向にはすぐ壁がある。別の向きを選ぼう。');
+    setPad(true);
+    busy = false;
+    return;
+  }
+
+  const player = document.getElementById('player');
+  let remaining = level.enemies;
+
+  for (let i = 1; i < result.path.length; i++){
+    const { r, c, kill } = result.path[i];
+    const prev = result.path[i - 1];
+    cellAt(prev.r, prev.c).classList.add('trail');
+    const target = cellAt(r, c);
+    target.appendChild(player);
+    if (kill){
+      target.classList.add('hit');
+      target.querySelector('.tile').textContent = '💥';
+      remaining--;
+      el.enemies.textContent = remaining;
+    }
+    await wait(kill ? 200 : 130);
+    if (kill) target.querySelector('.tile').textContent = '';
+  }
+
+  await wait(220);
+  if (result.cleared){
+    solved = true;
+    setBanner('ok', result.message);
+  } else {
+    setBanner('ng', result.message + '  ↺ Retry でもう一度。');
+  }
+  busy = false;
+}
+
+function move(dir){ play(dir); }
+
+padButtons.forEach(b => b.addEventListener('click', () => move(b.id)));
+el.retry.addEventListener('click', () => loadStage(stageIndex));
+el.next.addEventListener('click', () => {
+  const nextIndex = (stageIndex + 1) % STAGES.length;
+  loadStage(nextIndex);
+});
+
+const KEYS = {
+  ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
+  w:'up', s:'down', a:'left', d:'right',
+};
+window.addEventListener('keydown', e => {
+  const dir = KEYS[e.key];
+  if (dir){ e.preventDefault(); move(dir); }
+  if (e.key === 'r') loadStage(stageIndex);
+});
+
+buildBoard();
+loadStage(0);
+</script>
+</body>
+</html>

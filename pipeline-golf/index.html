@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline Golf</title>
+<link rel="stylesheet" href="../shared/golf.css">
+<style>
+  .io{display:grid; gap:10px}
+  @media(min-width:640px){ .io{grid-template-columns:1fr 1fr} }
+  .io .box{background:#0f131c; border:1px solid var(--border); border-radius:9px; padding:10px 12px}
+  .io .box .k{font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--dim)}
+  .io .box .v{font-family:var(--mono); font-size:15px; word-break:break-all; margin-top:3px}
+  .io .box.target .v{color:var(--amber)}
+  .io .box.input .v{color:var(--blue)}
+
+  .oplist{display:flex; flex-direction:column; gap:6px}
+  .oplist button{text-align:left; padding:9px 12px; font-size:13px; display:flex; justify-content:space-between; gap:10px}
+  .oplist button .d{color:var(--dim); font-size:11px; font-family:system-ui}
+
+  .pipe{display:flex; flex-direction:column; gap:6px; min-height:60px}
+  .pipe .step{
+    display:flex; align-items:center; gap:8px; background:#0f131c; border:1px solid var(--border);
+    border-radius:8px; padding:7px 10px; font-family:var(--mono); font-size:13px;
+  }
+  .pipe .step.now{border-color:var(--accent); background:rgba(110,231,183,.12); color:var(--accent)}
+  .pipe .step .n{color:var(--dim); font-size:11px; width:18px}
+  .pipe .step .name{flex:1}
+  .pipe .step button{padding:2px 8px; font-size:12px; background:none; border:0; color:var(--dim)}
+  .pipe .step button:hover{color:var(--text); background:none}
+  .pipe .empty{color:#4b5468; font-family:var(--mono); font-size:12px; padding:8px}
+
+  .trace{font-family:var(--mono); font-size:13px; line-height:1.85}
+  .trace .arrow{color:var(--dim)}
+  .trace .val{color:var(--text); word-break:break-all}
+  .trace .val.hit{color:var(--accent)}
+  .trace .val.miss{color:var(--red)}
+  .opcheck{display:flex; flex-wrap:wrap; gap:6px}
+  .opcheck label{
+    font-family:var(--mono); font-size:12px; padding:6px 10px; border-radius:7px;
+    background:#0f131c; border:1px solid var(--border); cursor:pointer; display:flex; gap:6px; align-items:center;
+  }
+  .opcheck label.on{border-color:var(--accent); color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>PIPELINE <span class="g">GOLF</span></h1>
+    <a class="home" href="../index.html">← 3ゲーム一覧</a>
+    <div class="tabs">
+      <button id="tabPlay" class="on">PLAY</button>
+      <button id="tabCreate">CREATE</button>
+    </div>
+  </div>
+  <p class="tagline">// 少ない関数で INPUT を TARGET に変換しろ</p>
+
+  <div id="notice" hidden></div>
+
+  <!-- ============ PLAY ============ -->
+  <div id="playView">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between; margin-bottom:10px">
+        <div class="row">
+          <span class="badge medium" id="chPar">PAR 3</span>
+          <span class="badge url" id="chSource">SAMPLE</span>
+        </div>
+        <div class="row" id="samples"></div>
+      </div>
+      <div class="io">
+        <div class="box input"><div class="k">INPUT</div><div class="v" id="ioInput"></div></div>
+        <div class="box target"><div class="k">TARGET</div><div class="v" id="ioTarget"></div></div>
+      </div>
+      <p class="hint" style="margin:8px 0 0">空白は <code>·</code> で表示しています</p>
+    </div>
+
+    <div class="cols two" style="margin-top:14px">
+      <div class="panel">
+        <h2>Available Operations</h2>
+        <div class="oplist" id="available"></div>
+      </div>
+      <div class="panel">
+        <h2>Pipeline <span id="pipeLen" style="color:var(--text)">0</span></h2>
+        <div class="pipe" id="pipe"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="run" class="primary">▶ RUN</button>
+          <button id="undo" class="ghost">UNDO</button>
+          <button id="clearPipe" class="ghost danger">CLEAR</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>Trace</h2>
+      <div class="trace" id="trace"><span class="hint">// RUN すると各ステップの途中結果が出ます</span></div>
+      <div class="result idle" id="result" style="margin-top:12px">READY</div>
+      <div class="row" style="margin-top:10px">
+        <button id="share">🔗 SHARE CHALLENGE</button>
+        <button id="remix">🎛 REMIX</button>
+        <button id="copyResult" disabled>📋 COPY RESULT</button>
+      </div>
+      <div class="share-box" style="margin-top:8px">
+        <div class="copy-status" id="copyStatus"></div>
+        <textarea id="shareOut" rows="3" readonly hidden></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CREATE ============ -->
+  <div id="createView" hidden>
+    <div class="panel">
+      <h2>Create Challenge</h2>
+      <div class="cols two">
+        <div>
+          <label class="field" for="edInput">Input</label>
+          <input type="text" id="edInput" maxlength="120">
+        </div>
+        <div>
+          <label class="field" for="edTarget">Target</label>
+          <input type="text" id="edTarget" maxlength="120">
+        </div>
+      </div>
+      <label class="field" style="margin-top:14px">Available operations</label>
+      <div class="opcheck" id="edOps"></div>
+      <label class="field" style="margin-top:14px">PAR</label>
+      <div class="row">
+        <input type="number" id="edPar" min="1" max="20" value="3" style="width:90px">
+        <button id="autoPar">AUTO</button>
+        <span class="hint">AUTO は最短解を探して PAR = 最短+1 にします</span>
+      </div>
+      <div class="result idle" id="edStatus" style="margin-top:12px">—</div>
+      <div class="row" style="margin-top:12px">
+        <button id="edShare" class="primary">🔗 SHARE CHALLENGE</button>
+        <button id="edTest">▶ TEST PLAY</button>
+      </div>
+      <div class="share-box" style="margin-top:8px">
+        <div class="copy-status" id="edCopyStatus"></div>
+        <textarea id="edShareOut" rows="3" readonly hidden></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../shared/url-codec.js"></script>
+<script>
+/* ==================== ゲームロジック（DOM非依存） ==================== */
+
+const TYPE = 'pipeline';
+
+/**
+ * 事前定義された安全な文字列操作だけを使う。
+ * ユーザーの入力を関数として解釈することは絶対にしない（eval / Function は不使用）。
+ * id はURLに載るので、一度決めたら変えない。
+ */
+const OPS = [
+  { id:'trim',    label:'trim',                  desc:'前後の空白を削除',       fn:s => s.trim() },
+  { id:'lower',   label:'lowercase',             desc:'小文字に',               fn:s => s.toLowerCase() },
+  { id:'upper',   label:'uppercase',             desc:'大文字に',               fn:s => s.toUpperCase() },
+  { id:'reverse', label:'reverse',               desc:'文字を逆順に',           fn:s => [...s].reverse().join('') },
+  { id:'nospace', label:'removeSpaces',          desc:'空白を全部削除',         fn:s => s.split(' ').join('') },
+  { id:'dash',    label:'replaceSpacesWithDash', desc:'空白を - に置換',        fn:s => s.split(' ').join('-') },
+  { id:'squeeze', label:'dedupeSpaces',          desc:'連続する空白を1つに',    fn:s => s.replace(/ {2,}/g, ' ') },
+  { id:'nodigit', label:'removeDigits',          desc:'数字を削除',             fn:s => s.replace(/[0-9]/g, '') },
+  { id:'digits',  label:'keepDigits',            desc:'数字だけ残す',           fn:s => s.replace(/[^0-9]/g, '') },
+  { id:'first5',  label:'first5',                desc:'先頭5文字',              fn:s => s.slice(0, 5) },
+  { id:'last5',   label:'last5',                 desc:'末尾5文字',              fn:s => s.slice(-5) },
+  { id:'sort',    label:'sortChars',             desc:'文字を昇順に並べ替え',   fn:s => [...s].sort().join('') },
+  { id:'uniq',    label:'uniqueChars',           desc:'重複文字を削除',         fn:s => [...new Set([...s])].join('') },
+  { id:'cap',     label:'capitalize',            desc:'先頭だけ大文字',         fn:s => s.charAt(0).toUpperCase() + s.slice(1) },
+];
+const OP_BY_ID = Object.fromEntries(OPS.map(o => [o.id, o]));
+
+/** パイプラインを実行し、各ステップの途中結果を返す */
+function runPipeline(input, ids){
+  const steps = [];
+  let value = input;
+  for (const id of ids){
+    value = OP_BY_ID[id].fn(value);
+    steps.push({ id, label: OP_BY_ID[id].label, value });
+  }
+  return { steps, output: value };
+}
+
+/** 最短で TARGET に到達するパイプラインを幅優先で探す。見つからなければ null。 */
+function solvePipeline(input, target, ids, maxDepth = 6, maxNodes = 60000){
+  if (input === target) return [];
+  const seen = new Set([input]);
+  let frontier = [{ value: input, path: [] }];
+  for (let depth = 1; depth <= maxDepth; depth++){
+    const next = [];
+    for (const node of frontier){
+      for (const id of ids){
+        const value = OP_BY_ID[id].fn(node.value);
+        const path = [...node.path, id];
+        if (value === target) return path;
+        if (seen.has(value) || seen.size > maxNodes) continue;
+        seen.add(value);
+        next.push({ value, path });
+      }
+    }
+    if (!next.length) break;
+    frontier = next;
+  }
+  return null;
+}
+
+function validateChallenge(d){
+  if (typeof d.input !== 'string' || typeof d.target !== 'string') return 'input / target が文字列ではありません';
+  if (d.input.length > 120 || d.target.length > 120) return 'input / target が長すぎます（120文字まで）';
+  if (!Array.isArray(d.ops) || d.ops.length < 1 || d.ops.length > OPS.length) return '使用可能な operation が不正です';
+  if (d.ops.some(id => !OP_BY_ID[id])) return '知らない operation が含まれています';
+  if (new Set(d.ops).size !== d.ops.length) return 'operation が重複しています';
+  if (!Number.isInteger(d.par) || d.par < 1 || d.par > 20) return 'PAR が不正です';
+  return null;
+}
+
+const SAMPLES = [
+  { name:'EASY', level:'easy', ch:{
+    input: '  Hello WORLD  ', target: 'hello-world',
+    ops: ['trim','lower','dash','reverse'], par: 4 } },
+  { name:'MEDIUM', level:'medium', ch:{
+    input: '  HACK a THON 2026 ', target: 'hack-a-thon',
+    ops: ['trim','lower','dash','nodigit','reverse','squeeze'], par: 5 } },
+  { name:'HARD', level:'hard', ch:{
+    input: 'Mississippi River 42', target: 'eimprsv',
+    ops: ['lower','uniq','sort','nospace','reverse','nodigit','last5','first5'], par: 6 } },
+];
+const defaultChallenge = () => JSON.parse(JSON.stringify(SAMPLES[0].ch));
+
+/* ==================== 画面 ==================== */
+
+const $ = id => document.getElementById(id);
+const MAX_PIPE = 12;
+
+let challenge = null;
+let pipeline = [];
+let running = false;
+let lastResult = null;
+
+function renderChallenge(source){
+  $('ioInput').innerHTML = Golf.quote(challenge.input);
+  $('ioTarget').innerHTML = Golf.quote(challenge.target);
+  $('chPar').textContent = `PAR ${challenge.par}`;
+  $('chSource').textContent = source === 'url' ? 'FROM URL' : 'SAMPLE';
+
+  $('available').innerHTML = '';
+  challenge.ops.forEach(id => {
+    const op = OP_BY_ID[id];
+    const b = document.createElement('button');
+    b.innerHTML = `<span>${op.label}</span><span class="d">${op.desc}</span>`;
+    b.addEventListener('click', () => addOp(id));
+    $('available').appendChild(b);
+  });
+}
+
+function renderPipeline(activeIndex = -1){
+  const box = $('pipe');
+  $('pipeLen').textContent = pipeline.length;
+  if (!pipeline.length){
+    box.innerHTML = '<div class="empty">// 左の operation を押して並べる</div>';
+    return;
+  }
+  box.innerHTML = '';
+  pipeline.forEach((id, i) => {
+    const div = document.createElement('div');
+    div.className = 'step' + (i === activeIndex ? ' now' : '');
+    div.innerHTML = `<span class="n">${i + 1}</span><span class="name">${OP_BY_ID[id].label}</span>`;
+    [['↑', () => swap(i, i - 1)], ['↓', () => swap(i, i + 1)], ['✕', () => removeAt(i)]]
+      .forEach(([label, action]) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.addEventListener('click', action);
+        div.appendChild(b);
+      });
+    box.appendChild(div);
+  });
+}
+
+function addOp(id){
+  if (running || pipeline.length >= MAX_PIPE) return;
+  pipeline.push(id);
+  renderPipeline();
+  resetOutput();
+}
+function removeAt(i){ if (running) return; pipeline.splice(i, 1); renderPipeline(); resetOutput(); }
+function swap(i, j){
+  if (running || j < 0 || j >= pipeline.length) return;
+  [pipeline[i], pipeline[j]] = [pipeline[j], pipeline[i]];
+  renderPipeline(); resetOutput();
+}
+
+function resetOutput(){
+  $('trace').innerHTML = '<span class="hint">// RUN すると各ステップの途中結果が出ます</span>';
+  $('result').className = 'result idle';
+  $('result').textContent = 'READY';
+  $('copyResult').disabled = true;
+  lastResult = null;
+}
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+async function run(){
+  if (running) return;
+  if (!pipeline.length){ $('result').className = 'result idle'; $('result').textContent = '// パイプラインが空です'; return; }
+  running = true;
+  $('run').disabled = true;
+
+  const { steps, output } = runPipeline(challenge.input, pipeline);
+  const trace = $('trace');
+  trace.innerHTML = `<div><span class="arrow">INPUT</span> <span class="val">${Golf.quote(challenge.input)}</span></div>`;
+
+  for (let i = 0; i < steps.length; i++){
+    renderPipeline(i);
+    await wait(380);
+    const s = steps[i];
+    const isLast = i === steps.length - 1;
+    const cls = isLast ? (output === challenge.target ? 'hit' : 'miss') : '';
+    trace.insertAdjacentHTML('beforeend',
+      `<div><span class="arrow">↓ ${s.label}</span></div>
+       <div><span class="val ${cls}">${Golf.quote(s.value)}</span></div>`);
+  }
+  renderPipeline(-1);
+  await wait(200);
+
+  if (output === challenge.target){
+    const used = pipeline.length;
+    const par = Golf.parLabel(used, challenge.par);
+    lastResult = { used, par: challenge.par, label: par.text };
+    $('result').className = 'result clear';
+    $('result').innerHTML = `✅ <b>CLEAR!</b><div class="score">
+      <span>Operations: <b>${used}</b></span>
+      <span>PAR: <b>${challenge.par}</b></span>
+      <span class="par ${par.tone}">${par.text}</span></div>`;
+    $('copyResult').disabled = false;
+  } else {
+    $('result').className = 'result fail';
+    $('result').innerHTML = `❌ TARGET と一致しません<div class="score">
+      <span>got: <b>${Golf.quote(output)}</b></span>
+      <span>want: <b>${Golf.quote(challenge.target)}</b></span></div>`;
+  }
+  running = false;
+  $('run').disabled = false;
+}
+
+$('run').addEventListener('click', run);
+$('undo').addEventListener('click', () => { if (running) return; pipeline.pop(); renderPipeline(); resetOutput(); });
+$('clearPipe').addEventListener('click', () => { if (running) return; pipeline = []; renderPipeline(); resetOutput(); });
+
+/* --- Challenge 読み込み --- */
+
+function loadChallenge(ch, source){
+  challenge = JSON.parse(JSON.stringify(ch));
+  pipeline = [];
+  renderChallenge(source);
+  renderPipeline();
+  resetOutput();
+  $('shareOut').hidden = true;
+  $('copyStatus').textContent = '';
+}
+
+function showNotice(kind, text){
+  const n = $('notice');
+  n.hidden = false; n.className = 'notice ' + kind; n.textContent = text;
+}
+
+SAMPLES.forEach(s => {
+  const b = document.createElement('button');
+  b.className = 'badge ' + s.level;
+  b.style.cursor = 'pointer';
+  b.textContent = s.name;
+  b.addEventListener('click', () => {
+    history.replaceState(null, '', location.pathname);
+    loadChallenge(s.ch, 'sample');
+    $('notice').hidden = true;
+  });
+  $('samples').appendChild(b);
+});
+
+/* --- Share / Result --- */
+
+$('share').addEventListener('click', () => {
+  Golf.setHash(TYPE, challenge);
+  Golf.copyText(Golf.challengeUrl(TYPE, challenge), $('shareOut'), $('copyStatus'));
+  $('chSource').textContent = 'FROM URL';
+});
+$('copyResult').addEventListener('click', () => {
+  if (!lastResult) return;
+  const text = [
+    'Pipeline Golf', '',
+    '✅ CLEAR',
+    `🧠 ${lastResult.used} operations`,
+    `🎯 PAR ${lastResult.par}`,
+    `⚡ ${lastResult.label}`,
+    '', 'Challenge:',
+    Golf.challengeUrl(TYPE, challenge),   // 解答は含めない
+  ].join('\n');
+  Golf.copyText(text, $('shareOut'), $('copyStatus'));
+});
+
+/* ==================== CREATE MODE ==================== */
+
+let draft = null;
+
+function renderEdOps(){
+  $('edOps').innerHTML = '';
+  OPS.forEach(op => {
+    const on = draft.ops.includes(op.id);
+    const label = document.createElement('label');
+    label.className = on ? 'on' : '';
+    label.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''}> ${op.label}`;
+    label.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) draft.ops.push(op.id);
+      else draft.ops = draft.ops.filter(id => id !== op.id);
+      renderEdOps(); updateDraftStatus();
+    });
+    $('edOps').appendChild(label);
+  });
+}
+
+function syncDraftFromInputs(){
+  draft.input = $('edInput').value;
+  draft.target = $('edTarget').value;
+  draft.par = Math.max(1, Math.min(20, +$('edPar').value || 1));
+}
+
+function updateDraftStatus(){
+  syncDraftFromInputs();
+  const problem = validateChallenge(draft);
+  if (problem){
+    $('edStatus').className = 'result fail';
+    $('edStatus').textContent = '⚠️ ' + problem;
+    $('edShare').disabled = true; $('edTest').disabled = true;
+    return;
+  }
+  const solution = solvePipeline(draft.input, draft.target, draft.ops);
+  if (!solution){
+    $('edStatus').className = 'result fail';
+    $('edStatus').innerHTML = '🚫 UNSOLVABLE — この operation の組み合わせでは 6手以内に TARGET へ到達できません';
+    $('edShare').disabled = true; $('edTest').disabled = true;
+    return;
+  }
+  $('edStatus').className = 'result clear';
+  $('edStatus').innerHTML = `✅ SOLVABLE<div class="score">
+    <span>最短: <b>${solution.length}</b> operations</span>
+    <span>PAR: <b>${draft.par}</b></span>
+    <span class="hint">${draft.par > solution.length ? `PAR ${solution.length - draft.par} まで縮められる` : 'PARが最短以下＝縮める余地なし'}</span></div>`;
+  $('edShare').disabled = false; $('edTest').disabled = false;
+}
+
+function openCreate(base){
+  draft = JSON.parse(JSON.stringify(base));
+  $('edInput').value = draft.input;
+  $('edTarget').value = draft.target;
+  $('edPar').value = draft.par;
+  renderEdOps();
+  updateDraftStatus();
+  $('edShareOut').hidden = true;
+  $('edCopyStatus').textContent = '';
+}
+
+['edInput', 'edTarget', 'edPar'].forEach(id => $(id).addEventListener('input', updateDraftStatus));
+$('autoPar').addEventListener('click', () => {
+  syncDraftFromInputs();
+  const solution = solvePipeline(draft.input, draft.target, draft.ops);
+  if (!solution) return;
+  $('edPar').value = solution.length + 1;
+  updateDraftStatus();
+});
+$('edShare').addEventListener('click', () => {
+  updateDraftStatus();
+  if (validateChallenge(draft)) return;
+  Golf.copyText(Golf.challengeUrl(TYPE, draft), $('edShareOut'), $('edCopyStatus'));
+});
+$('edTest').addEventListener('click', () => {
+  Golf.setHash(TYPE, draft);
+  loadChallenge(draft, 'url');
+  switchTab('play');
+});
+
+/* --- タブ --- */
+
+function switchTab(which){
+  const play = which === 'play';
+  $('playView').hidden = !play;
+  $('createView').hidden = play;
+  $('tabPlay').classList.toggle('on', play);
+  $('tabCreate').classList.toggle('on', !play);
+}
+$('tabPlay').addEventListener('click', () => switchTab('play'));
+$('tabCreate').addEventListener('click', () => { openCreate(challenge); switchTab('create'); });
+$('remix').addEventListener('click', () => { openCreate(challenge); switchTab('create'); });
+
+/* --- 起動 --- */
+
+const loaded = Golf.readChallenge({ type: TYPE, validate: validateChallenge, fallback: defaultChallenge });
+loadChallenge(loaded.data, loaded.source);
+if (loaded.source === 'invalid'){
+  showNotice('', `⚠️ Invalid Challenge: ${loaded.error} — DEFAULT CHALLENGE を読み込みました`);
+} else if (loaded.source === 'url'){
+  showNotice('info', '🔗 URLから Challenge を読み込みました');
+}
+openCreate(challenge);
+</script>
+</body>
+</html>

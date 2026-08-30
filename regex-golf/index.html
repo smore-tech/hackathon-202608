@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regex Golf</title>
+<link rel="stylesheet" href="../shared/golf.css">
+<style>
+  .rxbar{display:flex; align-items:center; gap:10px; background:#0f131c; border:1px solid var(--border);
+         border-radius:10px; padding:10px 14px; font-family:var(--mono)}
+  .rxbar .slash{color:var(--dim); font-size:20px}
+  .rxbar input{border:0; background:none; font-size:19px; padding:4px 0; color:var(--accent)}
+  .rxbar input:focus{outline:none}
+  .rxbar .len{color:var(--dim); font-size:12px; white-space:nowrap}
+
+  .lists{display:grid; gap:14px}
+  @media(min-width:640px){ .lists{grid-template-columns:1fr 1fr} }
+  .list h3{font-size:11px; font-family:var(--mono); letter-spacing:.12em; margin:0 0 8px; color:var(--dim)}
+  .list.match h3{color:var(--accent)}
+  .list.reject h3{color:var(--violet)}
+  .list ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px}
+  .list li{
+    display:flex; align-items:center; gap:9px; font-family:var(--mono); font-size:13px;
+    background:#0f131c; border:1px solid var(--border); border-radius:7px; padding:7px 11px;
+    word-break:break-all;
+  }
+  .list li.ok{border-color:rgba(110,231,183,.45)}
+  .list li.ng{border-color:rgba(248,113,113,.5); background:rgba(248,113,113,.08)}
+  .list li .mark{font-size:13px}
+  .list li.ok .mark{color:var(--accent)}
+  .list li.ng .mark{color:var(--red)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>REGEX <span class="g">GOLF</span></h1>
+    <a class="home" href="../index.html">← 3ゲーム一覧</a>
+    <div class="tabs">
+      <button id="tabPlay" class="on">PLAY</button>
+      <button id="tabCreate">CREATE</button>
+    </div>
+  </div>
+  <p class="tagline">// MATCH だけに当たる、できるだけ短い正規表現を書け</p>
+
+  <div id="notice" hidden></div>
+
+  <!-- ============ PLAY ============ -->
+  <div id="playView">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between; margin-bottom:10px">
+        <div class="row">
+          <span class="badge medium" id="chPar">PAR 20</span>
+          <span class="badge url" id="chSource">SAMPLE</span>
+        </div>
+        <div class="row" id="samples"></div>
+      </div>
+      <div class="rxbar">
+        <span class="slash">/</span>
+        <input type="text" id="rx" maxlength="100" placeholder="正規表現を入力" autocomplete="off" spellcheck="false">
+        <span class="slash">/</span>
+        <span class="len"><b id="rxLen">0</b> chars</span>
+      </div>
+      <p class="hint" style="margin:8px 0 0">スラッシュとフラグは不要。入力するたびに下の判定が更新されます。</p>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <div class="lists">
+        <div class="list match">
+          <h3>✅ MATCH — 全部にマッチさせる</h3>
+          <ul id="matchList"></ul>
+        </div>
+        <div class="list reject">
+          <h3>🚫 DO NOT MATCH — 1つもマッチさせない</h3>
+          <ul id="rejectList"></ul>
+        </div>
+      </div>
+      <div class="result idle" id="result" style="margin-top:14px">READY</div>
+      <div class="row" style="margin-top:10px">
+        <button id="share">🔗 SHARE CHALLENGE</button>
+        <button id="remix">🎛 REMIX</button>
+        <button id="copyResult" disabled>📋 COPY RESULT</button>
+      </div>
+      <div class="share-box" style="margin-top:8px">
+        <div class="copy-status" id="copyStatus"></div>
+        <textarea id="shareOut" rows="3" readonly hidden></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CREATE ============ -->
+  <div id="createView" hidden>
+    <div class="panel">
+      <h2>Create Challenge</h2>
+      <div class="cols two">
+        <div>
+          <label class="field" for="edMatch">Match strings（1行1件・最大12件）</label>
+          <textarea id="edMatch" rows="7"></textarea>
+        </div>
+        <div>
+          <label class="field" for="edReject">Do not match strings（1行1件・最大12件）</label>
+          <textarea id="edReject" rows="7"></textarea>
+        </div>
+      </div>
+      <label class="field" style="margin-top:14px">PAR（正規表現の文字数）</label>
+      <div class="row">
+        <input type="number" id="edPar" min="1" max="60" value="20" style="width:90px">
+        <button id="autoPar">AUTO</button>
+        <span class="hint">AUTO は「全部を列挙しただけの総当たり解」の長さを PAR にします</span>
+      </div>
+      <div class="result idle" id="edStatus" style="margin-top:12px">—</div>
+      <div class="row" style="margin-top:12px">
+        <button id="edShare" class="primary">🔗 SHARE CHALLENGE</button>
+        <button id="edTest">▶ TEST PLAY</button>
+      </div>
+      <div class="share-box" style="margin-top:8px">
+        <div class="copy-status" id="edCopyStatus"></div>
+        <textarea id="edShareOut" rows="3" readonly hidden></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../shared/url-codec.js"></script>
+<script>
+/* ==================== ゲームロジック（DOM非依存） ==================== */
+
+const TYPE = 'regex';
+const MAX_STRINGS = 12;
+const MAX_STRING_LEN = 40;
+const MAX_REGEX_LEN = 100;
+const SLOW_MS = 300;
+
+/**
+ * ユーザーの正規表現を評価する。
+ * ・g フラグは使わない（lastIndex による判定ゆれを避ける）
+ * ・不正な正規表現は例外にせずエラーとして返す
+ * ・テスト文字列は短く件数も少ないが、それでも重い正規表現は時間で打ち切る
+ */
+function evaluate(source, challenge){
+  if (!source) return { state: 'empty' };
+  if (source.length > MAX_REGEX_LEN) return { state: 'error', message: '長すぎます' };
+
+  let re;
+  try {
+    re = new RegExp(source);
+  } catch (e) {
+    return { state: 'error', message: e.message };
+  }
+
+  const started = Date.now();
+  const test = str => {
+    const hit = re.test(str);
+    return hit;
+  };
+  const match = challenge.match.map(s => ({ s, hit: test(s), want: true }));
+  const reject = challenge.reject.map(s => ({ s, hit: test(s), want: false }));
+  if (Date.now() - started > SLOW_MS) return { state: 'error', message: '評価に時間がかかりすぎました' };
+
+  const okMatch = match.every(r => r.hit);
+  const okReject = reject.every(r => !r.hit);
+  return {
+    state: okMatch && okReject ? 'clear' : 'partial',
+    match, reject,
+    passed: match.filter(r => r.hit).length + reject.filter(r => !r.hit).length,
+    total: match.length + reject.length,
+    length: source.length,
+  };
+}
+
+/** 全部を列挙しただけの「総当たり解」。必ず正解になるので PAR の基準に使える。 */
+function bruteForceSolution(matchList){
+  const escaped = matchList.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return '^(?:' + escaped.join('|') + ')$';
+}
+
+function validateChallenge(d){
+  const listOk = a => Array.isArray(a) && a.length >= 1 && a.length <= MAX_STRINGS
+    && a.every(s => typeof s === 'string' && s.length > 0 && s.length <= MAX_STRING_LEN);
+  if (!listOk(d.match)) return `MATCH のリストが不正です（1〜${MAX_STRINGS}件・各${MAX_STRING_LEN}文字まで）`;
+  if (!listOk(d.reject)) return `DO NOT MATCH のリストが不正です（1〜${MAX_STRINGS}件・各${MAX_STRING_LEN}文字まで）`;
+  const overlap = d.match.filter(s => d.reject.includes(s));
+  if (overlap.length) return `両方のリストに "${overlap[0]}" が入っています`;
+  if (!Number.isInteger(d.par) || d.par < 1 || d.par > 60) return 'PAR が不正です';
+  return null;
+}
+
+const SAMPLES = [
+  { name:'EASY', level:'easy', ch:{
+    match:  ['user_123', 'user_456', 'user_999'],
+    reject: ['admin_123', 'user_abc', 'guest_123'],
+    par: 32 } },
+  { name:'MEDIUM', level:'medium', ch:{
+    match:  ['2026-01-01', '2026-12-31', '1999-07-04'],
+    reject: ['2026-1-1', '26-01-01', '2026/01/01'],
+    par: 38 } },
+  { name:'HARD', level:'hard', ch:{
+    match:  ['ab', 'aabb', 'aaabbb'],
+    reject: ['ba', 'abab', 'b', 'a'],
+    par: 20 } },
+];
+const defaultChallenge = () => JSON.parse(JSON.stringify(SAMPLES[0].ch));
+
+/* ==================== 画面 ==================== */
+
+const $ = id => document.getElementById(id);
+let challenge = null;
+let lastResult = null;
+
+function renderList(el, rows, want){
+  el.innerHTML = '';
+  rows.forEach(row => {
+    const li = document.createElement('li');
+    const ok = row.hit === want;
+    li.className = row.hit === null ? '' : (ok ? 'ok' : 'ng');
+    li.innerHTML = `<span class="mark">${row.hit === null ? '·' : ok ? '✅' : '❌'}</span>` +
+      `<span>${Golf.escapeHtml(row.s)}</span>`;
+    el.appendChild(li);
+  });
+}
+
+function update(){
+  const source = $('rx').value;
+  $('rxLen').textContent = source.length;
+  const res = evaluate(source, challenge);
+
+  if (res.state === 'empty' || res.state === 'error'){
+    renderList($('matchList'), challenge.match.map(s => ({ s, hit: null })), true);
+    renderList($('rejectList'), challenge.reject.map(s => ({ s, hit: null })), false);
+    $('result').className = 'result ' + (res.state === 'error' ? 'fail' : 'idle');
+    $('result').textContent = res.state === 'error'
+      ? `⚠️ Invalid regex: ${res.message}`
+      : '// 正規表現を入力すると、その場で判定します';
+    $('copyResult').disabled = true;
+    lastResult = null;
+    return;
+  }
+
+  renderList($('matchList'), res.match, true);
+  renderList($('rejectList'), res.reject, false);
+
+  if (res.state === 'clear'){
+    const par = Golf.parLabel(res.length, challenge.par);
+    lastResult = { length: res.length, par: challenge.par, label: par.text };
+    $('result').className = 'result clear';
+    $('result').innerHTML = `🎯 <b>CLEAR!</b><div class="score">
+      <span>Regex length: <b>${res.length}</b></span>
+      <span>PAR: <b>${challenge.par}</b></span>
+      <span class="par ${par.tone}">${par.text}</span></div>`;
+    $('copyResult').disabled = false;
+  } else {
+    $('result').className = 'result fail';
+    $('result').innerHTML = `❌ ${res.passed} / ${res.total} 条件クリア — 赤い行が条件を満たしていません`;
+    $('copyResult').disabled = true;
+    lastResult = null;
+  }
+}
+
+function loadChallenge(ch, source){
+  challenge = JSON.parse(JSON.stringify(ch));
+  $('chPar').textContent = `PAR ${challenge.par}`;
+  $('chSource').textContent = source === 'url' ? 'FROM URL' : 'SAMPLE';
+  $('rx').value = '';
+  $('shareOut').hidden = true;
+  $('copyStatus').textContent = '';
+  update();
+}
+
+function showNotice(kind, text){
+  const n = $('notice');
+  n.hidden = false; n.className = 'notice ' + kind; n.textContent = text;
+}
+
+SAMPLES.forEach(s => {
+  const b = document.createElement('button');
+  b.className = 'badge ' + s.level;
+  b.style.cursor = 'pointer';
+  b.textContent = s.name;
+  b.addEventListener('click', () => {
+    history.replaceState(null, '', location.pathname);
+    loadChallenge(s.ch, 'sample');
+    $('notice').hidden = true;
+  });
+  $('samples').appendChild(b);
+});
+
+$('rx').addEventListener('input', update);
+
+$('share').addEventListener('click', () => {
+  Golf.setHash(TYPE, challenge);
+  Golf.copyText(Golf.challengeUrl(TYPE, challenge), $('shareOut'), $('copyStatus'));
+  $('chSource').textContent = 'FROM URL';
+});
+$('copyResult').addEventListener('click', () => {
+  if (!lastResult) return;
+  const text = [
+    'Regex Golf', '',
+    '✅ CLEAR',
+    `🧠 ${lastResult.length} chars`,
+    `🎯 PAR ${lastResult.par}`,
+    `⚡ ${lastResult.label}`,
+    '', 'Challenge:',
+    Golf.challengeUrl(TYPE, challenge),   // 解答（正規表現）は含めない
+  ].join('\n');
+  Golf.copyText(text, $('shareOut'), $('copyStatus'));
+});
+
+/* ==================== CREATE MODE ==================== */
+
+let draft = null;
+
+const parseLines = text => text.split('\n').map(s => s.trim()).filter(Boolean);
+
+function syncDraftFromInputs(){
+  draft.match = parseLines($('edMatch').value);
+  draft.reject = parseLines($('edReject').value);
+  draft.par = Math.max(1, Math.min(60, +$('edPar').value || 1));
+}
+
+function updateDraftStatus(){
+  syncDraftFromInputs();
+  const problem = validateChallenge(draft);
+  if (problem){
+    $('edStatus').className = 'result fail';
+    $('edStatus').textContent = '⚠️ ' + problem;
+    $('edShare').disabled = true; $('edTest').disabled = true;
+    return;
+  }
+  const brute = bruteForceSolution(draft.match);
+  const check = evaluate(brute, draft);
+  if (check.state !== 'clear'){
+    $('edStatus').className = 'result fail';
+    $('edStatus').textContent = '🚫 このMATCH/REJECTの組み合わせでは、どんな正規表現でも両立できません';
+    $('edShare').disabled = true; $('edTest').disabled = true;
+    return;
+  }
+  $('edStatus').className = 'result clear';
+  $('edStatus').innerHTML = `✅ SOLVABLE<div class="score">
+    <span>総当たり解: <b>${brute.length}</b> chars</span>
+    <span>PAR: <b>${draft.par}</b></span>
+    <span class="hint">${draft.par < brute.length ? '総当たりより短く書かせる設定' : '総当たり解でもPARを切れる（ゆるい）'}</span></div>
+    <div class="hint" style="word-break:break-all">${Golf.escapeHtml(brute)}</div>`;
+  $('edShare').disabled = false; $('edTest').disabled = false;
+}
+
+function openCreate(base){
+  draft = JSON.parse(JSON.stringify(base));
+  $('edMatch').value = draft.match.join('\n');
+  $('edReject').value = draft.reject.join('\n');
+  $('edPar').value = draft.par;
+  updateDraftStatus();
+  $('edShareOut').hidden = true;
+  $('edCopyStatus').textContent = '';
+}
+
+['edMatch', 'edReject', 'edPar'].forEach(id => $(id).addEventListener('input', updateDraftStatus));
+$('autoPar').addEventListener('click', () => {
+  syncDraftFromInputs();
+  if (!draft.match.length) return;
+  $('edPar').value = Math.min(60, bruteForceSolution(draft.match).length);
+  updateDraftStatus();
+});
+$('edShare').addEventListener('click', () => {
+  updateDraftStatus();
+  if (validateChallenge(draft)) return;
+  Golf.copyText(Golf.challengeUrl(TYPE, draft), $('edShareOut'), $('edCopyStatus'));
+});
+$('edTest').addEventListener('click', () => {
+  Golf.setHash(TYPE, draft);
+  loadChallenge(draft, 'url');
+  switchTab('play');
+});
+
+/* --- タブ --- */
+
+function switchTab(which){
+  const play = which === 'play';
+  $('playView').hidden = !play;
+  $('createView').hidden = play;
+  $('tabPlay').classList.toggle('on', play);
+  $('tabCreate').classList.toggle('on', !play);
+  if (play) $('rx').focus();
+}
+$('tabPlay').addEventListener('click', () => switchTab('play'));
+$('tabCreate').addEventListener('click', () => { openCreate(challenge); switchTab('create'); });
+$('remix').addEventListener('click', () => { openCreate(challenge); switchTab('create'); });
+
+/* --- 起動 --- */
+
+const loaded = Golf.readChallenge({ type: TYPE, validate: validateChallenge, fallback: defaultChallenge });
+loadChallenge(loaded.data, loaded.source);
+if (loaded.source === 'invalid'){
+  showNotice('', `⚠️ Invalid Challenge: ${loaded.error} — DEFAULT CHALLENGE を読み込みました`);
+} else if (loaded.source === 'url'){
+  showNotice('info', '🔗 URLから Challenge を読み込みました');
+}
+openCreate(challenge);
+</script>
+</body>
+</html>

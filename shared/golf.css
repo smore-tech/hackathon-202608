@@ -1,0 +1,96 @@
+/* URL Golf 3作に共通のスタイル。IDE寄りの暗い配色だが、盤面や結果はゲームらしく見せる。 */
+:root{
+  --bg:#0d1017; --panel:#151a24; --panel2:#1b2130; --line:#28304200;
+  --border:#283042; --text:#dbe3f0; --dim:#7c869c;
+  --accent:#6ee7b7; --blue:#7dd3fc; --amber:#fbbf24; --red:#f87171; --violet:#c4b5fd;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+body{
+  margin:0; background:radial-gradient(circle at 50% -15%,#1a2130,#0a0c12 60%);
+  color:var(--text); font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans",sans-serif;
+  min-height:100vh; padding:14px 12px 48px; line-height:1.6;
+}
+.wrap{max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:14px}
+
+/* --- ヘッダ / タブ --- */
+.top{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+.top h1{font-size:19px; margin:0; font-family:var(--mono); letter-spacing:.02em}
+.top h1 .g{color:var(--accent)}
+.home{font-size:12px; color:var(--dim); text-decoration:none; border-bottom:1px dotted var(--dim)}
+.home:hover{color:var(--text)}
+.tabs{display:flex; gap:6px; margin-left:auto; background:var(--panel); padding:4px; border-radius:10px; border:1px solid var(--border)}
+.tabs button{
+  font:inherit; font-size:13px; font-weight:700; letter-spacing:.06em; color:var(--dim);
+  background:none; border:0; padding:7px 16px; border-radius:7px; cursor:pointer;
+}
+.tabs button.on{background:var(--accent); color:#062a1e}
+.tagline{font-size:12px; color:var(--dim); margin:-8px 0 0; font-family:var(--mono)}
+
+/* --- パネル --- */
+.panel{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px}
+.panel h2{
+  font-size:11px; margin:0 0 10px; color:var(--dim); font-family:var(--mono);
+  letter-spacing:.14em; text-transform:uppercase; font-weight:700;
+}
+.cols{display:grid; gap:14px}
+@media(min-width:760px){ .cols.two{grid-template-columns:1fr 1fr} .cols.side{grid-template-columns:minmax(0,1fr) 320px} }
+
+/* --- ボタン --- */
+button, .btn{
+  font:inherit; font-size:14px; color:var(--text); background:var(--panel2);
+  border:1px solid var(--border); border-radius:9px; padding:10px 16px; cursor:pointer;
+  transition:transform .07s, background .15s; font-family:var(--mono);
+}
+button:active{transform:translateY(2px)}
+button:hover:not(:disabled){background:#242c3d}
+button:disabled{opacity:.35; cursor:not-allowed}
+button.primary{background:var(--accent); color:#062a1e; border-color:transparent; font-weight:800}
+button.ghost{background:none}
+button.danger{color:var(--red)}
+.row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+
+/* --- バッジ / チップ --- */
+.badge{
+  font-family:var(--mono); font-size:11px; padding:3px 9px; border-radius:999px;
+  border:1px solid var(--border); color:var(--dim); letter-spacing:.05em;
+}
+.badge.easy{color:var(--accent); border-color:rgba(110,231,183,.4)}
+.badge.medium{color:var(--amber); border-color:rgba(251,191,36,.4)}
+.badge.hard{color:var(--red); border-color:rgba(248,113,113,.4)}
+.badge.url{color:var(--blue); border-color:rgba(125,211,252,.4)}
+
+/* --- 入力 --- */
+input[type=text], input[type=number], textarea, select{
+  font-family:var(--mono); font-size:14px; color:var(--text); background:#0f131c;
+  border:1px solid var(--border); border-radius:8px; padding:9px 11px; width:100%;
+}
+input:focus, textarea:focus, select:focus{outline:2px solid rgba(110,231,183,.35); outline-offset:-1px}
+textarea{resize:vertical; line-height:1.7}
+label.field{display:block; font-size:11px; color:var(--dim); font-family:var(--mono); letter-spacing:.1em; margin-bottom:5px; text-transform:uppercase}
+
+/* --- 結果 --- */
+.result{border-radius:10px; padding:12px 14px; font-family:var(--mono); font-size:14px; line-height:1.8}
+.result.clear{background:rgba(110,231,183,.12); border:1px solid rgba(110,231,183,.35); color:var(--accent)}
+.result.fail{background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.3); color:var(--red)}
+.result.idle{background:var(--panel2); color:var(--dim)}
+.score{display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:13px}
+.score b{color:var(--text)}
+.par{font-weight:800; padding:2px 10px; border-radius:6px}
+.par.under{background:var(--accent); color:#062a1e}
+.par.even{background:var(--blue); color:#06263a}
+.par.over{background:#3a4257; color:var(--text)}
+
+/* --- 共有 --- */
+.share-box{display:flex; flex-direction:column; gap:8px}
+.share-box textarea{font-size:12px; min-height:64px; color:var(--blue)}
+.copy-status{font-size:12px; font-family:var(--mono); min-height:18px}
+.copy-status.ok{color:var(--accent)}
+.copy-status.warn{color:var(--amber)}
+.notice{
+  font-size:13px; font-family:var(--mono); padding:9px 13px; border-radius:9px;
+  background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); color:var(--amber);
+}
+.notice.info{background:rgba(125,211,252,.1); border-color:rgba(125,211,252,.3); color:var(--blue)}
+.hint{font-size:12px; color:var(--dim); font-family:var(--mono)}
+code{font-family:var(--mono); background:var(--panel2); padding:1px 6px; border-radius:5px; font-size:.92em}

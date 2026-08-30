@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10秒先を当てる — Future Prediction</title>
+<style>
+  :root{
+    --bg:#0f1118; --panel:#1a1e2b; --line:#2c3346; --text:#e9edf6; --dim:#8b93a7;
+    --accent:#ffb648; --ok:#4dd6a0; --ng:#ff6b81; --hp:#4dd6a0;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{
+    margin:0; background:radial-gradient(circle at 50% -20%,#232a3d,#0c0e14 60%);
+    color:var(--text); font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans",sans-serif;
+    min-height:100vh; padding:16px 12px 40px;
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+  }
+  h1{font-size:20px; margin:0; letter-spacing:.05em}
+  h1 span{color:var(--accent)}
+  .sub{font-size:12px; color:var(--dim); margin:-8px 0 0; text-align:center}
+
+  .bar{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center}
+  .chip{
+    font-size:13px; padding:8px 12px; border-radius:999px; background:#232a3b;
+    border:1px solid var(--line); cursor:pointer; color:var(--dim);
+  }
+  .chip.on{background:var(--accent); color:#3a2500; border-color:transparent; font-weight:700}
+
+  .hud{
+    display:flex; gap:12px; align-items:center; font-size:13px;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 14px;
+  }
+  .hud b{color:var(--accent)}
+
+  .roster{
+    display:flex; gap:10px; flex-wrap:wrap; justify-content:center; max-width:920px; width:100%;
+  }
+  .card{
+    width:150px; background:var(--panel); border:2px solid var(--line); border-radius:14px;
+    padding:12px 10px; cursor:pointer; position:relative; transition:transform .12s, border-color .15s, opacity .3s;
+    text-align:center;
+  }
+  .card:hover{transform:translateY(-3px)}
+  .card.picked{border-color:var(--accent); box-shadow:0 0 0 3px rgba(255,182,72,.18)}
+  .card.picked::before{
+    content:"YOUR PICK"; position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+    background:var(--accent); color:#3a2500; font-size:9px; font-weight:800; letter-spacing:.08em;
+    padding:2px 8px; border-radius:999px; white-space:nowrap;
+  }
+  .card.dead{opacity:.32; filter:grayscale(1)}
+  .card.attacking{animation:lunge .3s}
+  .card.hurt{animation:hurt .3s}
+  @keyframes lunge{50%{transform:translateY(-10px) scale(1.05)}}
+  @keyframes hurt{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+  .face{font-size:34px; line-height:1.1}
+  .name{font-size:13px; font-weight:700; margin:4px 0 6px}
+  .hpbar{height:9px; border-radius:999px; background:#333c52; overflow:hidden}
+  .hpfill{height:100%; background:var(--hp); transition:width .25s}
+  .hpfill.low{background:var(--ng)}
+  .hpnum{font-size:11px; color:var(--dim); margin-top:3px}
+  .stats{display:flex; justify-content:center; gap:8px; font-size:11px; margin-top:6px; color:var(--dim)}
+  .stats b{color:var(--text)}
+  .target{font-size:10px; color:#7fb4ff; margin-top:6px; min-height:14px}
+  .pop{
+    position:absolute; left:50%; top:16px; transform:translateX(-50%);
+    color:var(--ng); font-weight:800; font-size:20px; pointer-events:none;
+    animation:float .7s ease-out forwards;
+  }
+  @keyframes float{to{transform:translate(-50%,-26px); opacity:0}}
+  .crown{position:absolute; top:-14px; right:-6px; font-size:22px}
+
+  .log{
+    width:100%; max-width:520px; height:110px; overflow-y:auto; background:#141824;
+    border:1px solid var(--line); border-radius:10px; padding:8px 12px;
+    font-size:12px; line-height:1.7; color:var(--dim); font-variant-numeric:tabular-nums;
+  }
+  .log .ko{color:var(--ng); font-weight:700}
+
+  button{
+    font:inherit; font-size:15px; color:var(--text); background:#2b3145;
+    border:1px solid var(--line); border-radius:10px; padding:12px 20px; cursor:pointer;
+    transition:transform .08s;
+  }
+  button:active{transform:translateY(2px)}
+  button:disabled{opacity:.35; cursor:not-allowed}
+  .primary{background:var(--accent); color:#3a2500; border-color:transparent; font-weight:800; min-width:180px}
+
+  .banner{
+    min-height:44px; display:flex; align-items:center; justify-content:center;
+    font-size:15px; text-align:center; padding:8px 16px; border-radius:10px; max-width:520px; line-height:1.5;
+  }
+  .banner.ok{background:rgba(77,214,160,.15); color:var(--ok)}
+  .banner.ng{background:rgba(255,107,129,.13); color:var(--ng)}
+  .banner.idle{color:var(--dim)}
+  .rule{font-size:11px; color:var(--dim); text-align:center; max-width:520px; line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>10秒先を<span>当てる</span></h1>
+  <p class="sub">介入はできない。数字と並び順だけを見て、最後の1体を当てろ。</p>
+
+  <div class="bar" id="presetBar"></div>
+
+  <div class="hud">
+    <span>予想 <b id="hudPick">—</b></span>
+    <span>｜ 的中 <b id="hudScore">0 / 0</b></span>
+  </div>
+
+  <div class="roster" id="roster"></div>
+
+  <div class="banner idle" id="banner">生き残ると思うキャラをタップして、STARTを押す。</div>
+
+  <div class="bar">
+    <button id="start" class="primary">▶ START</button>
+    <button id="replay">↺ もう一度見る</button>
+    <button id="nextSet">次の編成 →</button>
+  </div>
+
+  <div class="log" id="log"></div>
+  <p class="rule">ルール：SPEEDが速いほど攻撃間隔が短い／攻撃相手は「自分のひとつ右の生存者」（右端は左端へ）／HPが0で脱落。</p>
+
+<script>
+/* ===================== ゲームロジック（DOM非依存） ===================== */
+
+const PRESETS = [
+  { label:'編成A（3体）', units:[
+    { name:'ガーディアン', face:'🛡️', hp:120, atk:8,  spd:3 },
+    { name:'アサシン',     face:'🗡️', hp:40,  atk:14, spd:9 },
+    { name:'レンジャー',   face:'🏹', hp:70,  atk:10, spd:5 },
+  ]},
+  { label:'編成B（4体）', units:[
+    { name:'ゴーレム',     face:'🗿', hp:150, atk:6,  spd:2 },
+    { name:'ウィザード',   face:'🔮', hp:55,  atk:18, spd:4 },
+    { name:'ナイフ使い',   face:'🔪', hp:45,  atk:7,  spd:10 },
+    { name:'ソルジャー',   face:'⚔️', hp:90,  atk:9,  spd:5 },
+  ]},
+  { label:'編成C（5体）', units:[
+    { name:'バーサーカー', face:'🔥', hp:60,  atk:20, spd:6 },
+    { name:'クレリック',   face:'✨', hp:100, atk:5,  spd:4 },
+    { name:'シーフ',       face:'💨', hp:35,  atk:9,  spd:12 },
+    { name:'ランサー',     face:'🔱', hp:80,  atk:11, spd:5 },
+    { name:'ガードマン',   face:'🧱', hp:130, atk:7,  spd:3 },
+  ]},
+];
+
+/**
+ * 自動戦闘を最後までシミュレートし、イベントのログを返す。
+ * ・攻撃間隔 = 1000 / SPEED
+ * ・攻撃相手 = 自分のひとつ右の生存者（円環）
+ * 完全に決定論的なので、同じ編成なら結果は必ず同じになる。
+ */
+function simulateBattle(units){
+  const st = units.map((u, i) => ({ i, hp:u.hp, atk:u.atk, spd:u.spd, next:1000 / u.spd }));
+  const log = [];
+  const aliveCount = () => st.filter(u => u.hp > 0).length;
+
+  for (let guard = 0; aliveCount() > 1 && guard < 500; guard++){
+    let at = null;
+    for (const u of st){
+      if (u.hp <= 0) continue;
+      if (!at || u.next < at.next || (u.next === at.next && u.spd > at.spd)) at = u;
+    }
+    let tg = null;
+    for (let k = 1; k < st.length; k++){
+      const c = st[(at.i + k) % st.length];
+      if (c.hp > 0){ tg = c; break; }
+    }
+    if (!tg) break;
+
+    tg.hp -= at.atk;
+    log.push({
+      time: at.next, attacker: at.i, target: tg.i,
+      damage: at.atk, hpAfter: Math.max(0, tg.hp), ko: tg.hp <= 0,
+    });
+    at.next += 1000 / at.spd;
+  }
+
+  const survivor = st.find(u => u.hp > 0);
+  return { log, winner: survivor ? survivor.i : -1 };
+}
+
+/** 「そのキャラが今狙っている相手」を返す（表示用） */
+function currentTarget(hps, i){
+  for (let k = 1; k < hps.length; k++){
+    const j = (i + k) % hps.length;
+    if (hps[j] > 0) return j;
+  }
+  return -1;
+}
+
+const RANDOM_POOL = [
+  ['スライム','🟢'], ['ドラゴン','🐲'], ['スケルトン','💀'], ['ゴースト','👻'],
+  ['ロボット','🤖'], ['クマ','🐻'], ['タコ','🐙'], ['ハチ','🐝'], ['サボテン','🌵'],
+];
+
+function randomPreset(){
+  const pool = RANDOM_POOL.slice().sort(() => Math.random() - 0.5);
+  const size = 3 + Math.floor(Math.random() * 3); // 3〜5体
+  const pick = (min, max, step = 1) =>
+    min + Math.floor(Math.random() * ((max - min) / step + 1)) * step;
+
+  for (let tries = 0; tries < 30; tries++){
+    const units = pool.slice(0, size).map(([name, face]) => ({
+      name, face, hp: pick(35, 150, 5), atk: pick(5, 20), spd: pick(2, 12),
+    }));
+    const { winner, log } = simulateBattle(units);
+    if (winner >= 0 && log.length >= 6 && log.length <= 80){
+      return { label:'ランダム編成', units };
+    }
+  }
+  return PRESETS[0];
+}
+
+/* ===================== 画面 ===================== */
+
+const el = {
+  presetBar: document.getElementById('presetBar'),
+  roster: document.getElementById('roster'),
+  banner: document.getElementById('banner'),
+  log: document.getElementById('log'),
+  start: document.getElementById('start'),
+  replay: document.getElementById('replay'),
+  nextSet: document.getElementById('nextSet'),
+  hudPick: document.getElementById('hudPick'),
+  hudScore: document.getElementById('hudScore'),
+};
+
+let presetIndex = 0;
+let preset = PRESETS[0];
+let pick = -1;
+let running = false;
+let scored = false;
+let score = { hit: 0, total: 0 };
+
+function buildPresetBar(){
+  el.presetBar.innerHTML = '';
+  PRESETS.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = p.label;
+    b.dataset.index = i;
+    b.addEventListener('click', () => loadPreset(i));
+    el.presetBar.appendChild(b);
+  });
+  const rnd = document.createElement('button');
+  rnd.className = 'chip';
+  rnd.textContent = '🎲 ランダム';
+  rnd.addEventListener('click', () => loadPreset(-1));
+  el.presetBar.appendChild(rnd);
+}
+
+function renderRoster(hps){
+  el.roster.innerHTML = '';
+  preset.units.forEach((u, i) => {
+    const hp = hps[i];
+    const ratio = Math.max(0, hp / u.hp);
+    const card = document.createElement('div');
+    card.className = 'card' + (i === pick ? ' picked' : '') + (hp <= 0 ? ' dead' : '');
+    card.id = 'u' + i;
+    const tgt = currentTarget(hps, i);
+    card.innerHTML = `
+      <div class="face">${hp <= 0 ? '💀' : u.face}</div>
+      <div class="name">${u.name}</div>
+      <div class="hpbar"><div class="hpfill${ratio <= .3 ? ' low' : ''}" style="width:${ratio * 100}%"></div></div>
+      <div class="hpnum"><span class="cur">${Math.max(0, hp)}</span> / ${u.hp}</div>
+      <div class="stats"><span>ATK <b>${u.atk}</b></span><span>SPD <b>${u.spd}</b></span></div>
+      <div class="target">${hp <= 0 || tgt < 0 ? '' : '🎯 ' + preset.units[tgt].name}</div>`;
+    card.addEventListener('click', () => choose(i));
+    el.roster.appendChild(card);
+  });
+}
+
+function choose(i){
+  if (running || scored) return;
+  pick = i;
+  el.hudPick.textContent = preset.units[i].name;
+  renderRoster(preset.units.map(u => u.hp));
+  setBanner('idle', `「${preset.units[i].name}」が最後まで残ると予想。STARTで確かめる。`);
+}
+
+function setBanner(kind, text){
+  el.banner.className = 'banner ' + kind;
+  el.banner.textContent = text;
+}
+
+function addLog(html, cls = ''){
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.innerHTML = html;
+  el.log.appendChild(line);
+  el.log.scrollTop = el.log.scrollHeight;
+}
+
+function loadPreset(index){
+  if (running) return;
+  presetIndex = index;
+  preset = index < 0 ? randomPreset() : PRESETS[index];
+  pick = -1;
+  scored = false;
+  el.hudPick.textContent = '—';
+  el.log.innerHTML = '';
+  renderRoster(preset.units.map(u => u.hp));
+  [...el.presetBar.children].forEach((c, i) => {
+    c.classList.toggle('on', index < 0 ? i === el.presetBar.children.length - 1 : String(i) === String(index));
+  });
+  setBanner('idle', '生き残ると思うキャラをタップして、STARTを押す。');
+  el.start.disabled = false;
+  el.replay.disabled = false;
+}
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+async function runBattle(){
+  if (running) return;
+  if (pick < 0){ setBanner('ng', 'まず1体を選んでください。'); return; }
+  running = true;
+  el.start.disabled = true;
+  el.log.innerHTML = '';
+  setBanner('idle', '⚔️ 戦闘開始 — もう手は出せない。');
+
+  const hps = preset.units.map(u => u.hp);
+  renderRoster(hps);
+
+  const { log, winner } = simulateBattle(preset.units);
+  // 全体が 4〜6 秒で終わるようにテンポを決める
+  const step = Math.max(80, Math.min(320, Math.round(5000 / Math.max(1, log.length))));
+
+  for (const ev of log){
+    hps[ev.target] = ev.hpAfter;
+    const A = preset.units[ev.attacker], T = preset.units[ev.target];
+    const aCard = document.getElementById('u' + ev.attacker);
+    const tCard = document.getElementById('u' + ev.target);
+
+    aCard.classList.remove('attacking'); void aCard.offsetWidth; aCard.classList.add('attacking');
+    tCard.classList.remove('hurt'); void tCard.offsetWidth; tCard.classList.add('hurt');
+
+    const fill = tCard.querySelector('.hpfill');
+    const ratio = ev.hpAfter / T.hp;
+    fill.style.width = (ratio * 100) + '%';
+    fill.classList.toggle('low', ratio <= .3);
+    tCard.querySelector('.cur').textContent = ev.hpAfter;
+
+    const pop = document.createElement('div');
+    pop.className = 'pop';
+    pop.textContent = '-' + ev.damage;
+    tCard.appendChild(pop);
+    setTimeout(() => pop.remove(), 700);
+
+    if (ev.ko){
+      tCard.classList.add('dead');
+      tCard.querySelector('.face').textContent = '💀';
+      tCard.querySelector('.target').textContent = '';
+      addLog(`💀 <b>${T.name}</b> 脱落！`, 'ko');
+      // 死亡でターゲットが繋ぎ変わるので、狙い先の表示を更新する
+      preset.units.forEach((_, i) => {
+        const t = currentTarget(hps, i);
+        const node = document.getElementById('u' + i).querySelector('.target');
+        node.textContent = (hps[i] <= 0 || t < 0) ? '' : '🎯 ' + preset.units[t].name;
+      });
+    } else {
+      addLog(`${A.face} ${A.name} → ${T.face} ${T.name} に <b>${ev.damage}</b> ダメージ（残り ${ev.hpAfter}）`);
+    }
+    await wait(ev.ko ? step + 260 : step);
+  }
+
+  await wait(300);
+  const win = preset.units[winner];
+  const winCard = document.getElementById('u' + winner);
+  if (winCard){
+    const crown = document.createElement('div');
+    crown.className = 'crown';
+    crown.textContent = '👑';
+    winCard.appendChild(crown);
+  }
+  addLog(`👑 <b>${win ? win.name : '—'}</b> が生き残った`, 'ko');
+
+  if (!scored){
+    score.total++;
+    if (winner === pick) score.hit++;
+    el.hudScore.textContent = `${score.hit} / ${score.total}`;
+    scored = true;
+  }
+  setBanner(winner === pick ? 'ok' : 'ng',
+    winner === pick
+      ? `🎯 的中！ ${win.name} が最後まで残った。`
+      : `❌ はずれ。生き残ったのは ${win ? win.name : '誰もいない'}。なぜ ${preset.units[pick].name} は落ちた？`);
+
+  running = false;
+  el.start.disabled = true;
+}
+
+el.start.addEventListener('click', runBattle);
+el.replay.addEventListener('click', () => {
+  if (running) return;
+  if (pick < 0){ setBanner('ng', 'まず1体を選んでください。'); return; }
+  el.start.disabled = false;
+  renderRoster(preset.units.map(u => u.hp));
+  runBattle();
+});
+el.nextSet.addEventListener('click', () => {
+  if (running) return;
+  const next = presetIndex < 0 ? 0 : (presetIndex + 1);
+  loadPreset(next >= PRESETS.length ? -1 : next);
+});
+
+buildPresetBar();
+loadPreset(0);
+</script>
+</body>
+</html>
